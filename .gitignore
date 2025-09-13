@@ -1,0 +1,46 @@
+# 虛擬環境
+venv/
+env/
+.venv/
+.env
+
+# Python 快取檔案
+__pycache__/
+*.py[cod]
+*$py.class
+
+# UV 檔案
+uv.lock
+
+# 下載檔案和報告
+downloads/*.xlsx
+downloads/*.xls
+reports/*.json
+logs/*.log
+
+# 設定檔案（包含敏感資訊）
+accounts.json
+
+# 截圖檔案
+*.png
+
+# 抓取的資料檔案（舊版）
+scraped_data_*.json
+scraped_summary_*.json
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# 編輯器檔案
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 日誌檔案
+*.log
+
+# 暫存檔案
+temp/
+tmp/
