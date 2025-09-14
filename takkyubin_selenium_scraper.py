@@ -5,19 +5,79 @@ import sys
 import os
 import time
 
-# 設定 Windows 終端支援 UTF-8 輸出
+# 優先處理 Windows 編碼問題
+def safe_print(message):
+    """Windows 相容的列印函數"""
+    if sys.platform == "win32":
+        # Windows 環境，移除可能造成問題的 Unicode 字符
+        message = message.replace("✅", "[OK]")
+        message = message.replace("❌", "[ERROR]")
+        message = message.replace("⚠️", "[WARNING]")
+        message = message.replace("🔇", "[HEADLESS]")
+        message = message.replace("🖥️", "[WINDOW]")
+        message = message.replace("📦", "[PACKAGE]")
+        message = message.replace("🏢", "[MULTI]")
+        message = message.replace("📊", "[DATA]")
+        message = message.replace("🎯", "[TARGET]")
+        message = message.replace("🐱", "[CAT]")
+        message = message.replace("🚀", "[LAUNCH]")
+        message = message.replace("🌐", "[WEB]")
+        message = message.replace("📝", "[WRITE]")
+        message = message.replace("🔍", "[SEARCH]")
+        message = message.replace("📅", "[DATE]")
+        message = message.replace("📥", "[DOWNLOAD]")
+        message = message.replace("🎉", "[SUCCESS]")
+        message = message.replace("💥", "[ERROR]")
+        message = message.replace("🔚", "[CLOSE]")
+        message = message.replace("⏳", "[WAIT]")
+    print(message)
+
+# 設定 Windows UTF-8 支援（如果可能）
 if sys.platform == "win32":
     try:
+        # 設定控制台代碼頁為 UTF-8
+        os.system('chcp 65001 > nul 2>&1')
+
         # 設定控制台輸出編碼為 UTF-8
         import codecs
         sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
         sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
-        # 設定控制台代碼頁為 UTF-8
-        os.system('chcp 65001 > nul')
+        # 如果成功，使用正常的 print
+        safe_print = print
     except Exception:
-        # 如果設定失敗，使用替代方案
+        # 如果設定失敗，使用相容模式（已定義的 safe_print）
         pass
+
+# 設定環境變數關閉輸出緩衝，確保 Windows 即時顯示
+# 檢查並強制設定 PYTHONUNBUFFERED 環境變數
+if not os.environ.get('PYTHONUNBUFFERED'):
+    safe_print("⚠️ 偵測到未設定 PYTHONUNBUFFERED 環境變數")
+    safe_print("📝 請使用以下方式執行以確保即時輸出：")
+    if sys.platform == "win32":
+        print("")
+        print("   推薦方式1 - 使用 Windows 批次檔:")
+        print("   run_takkyubin.cmd download")
+        print("")
+        print("   推薦方式2 - Windows 命令提示字元:")
+        print("   set PYTHONUNBUFFERED=1")
+        print("   python -u takkyubin_selenium_scraper.py")
+        print("")
+        print("   推薦方式3 - PowerShell:")
+        print("   $env:PYTHONUNBUFFERED='1'")
+        print("   python -u takkyubin_selenium_scraper.py")
+    else:
+        print("   推薦方式 - 使用 shell 腳本:")
+        print("   ./run_takkyubin.sh download")
+        print("")
+        print("   或手動設定:")
+        print("   export PYTHONUNBUFFERED=1")
+        print("   python -u takkyubin_selenium_scraper.py")
+    print("")
+    safe_print("❌ 程式將退出，請使用上述方式重新執行")
+    sys.exit(1)
+
+safe_print("✅ PYTHONUNBUFFERED 環境變數已設定")
 
 import re
 import json
@@ -42,7 +102,7 @@ class TakkyubinSeleniumScraper:
     使用 Selenium 的黑貓宅急便自動登入抓取工具
     """
 
-    def __init__(self, username, password, headless=False, download_base_dir="downloads"):
+    def __init__(self, username, password, headless=False, download_base_dir="downloads", period_number=1):
         # 載入環境變數
         load_dotenv()
 
@@ -56,6 +116,12 @@ class TakkyubinSeleniumScraper:
 
         # 儲存當前選擇的結算區間
         self.current_settlement_period = None
+
+        # 期數設定 (1=最新一期, 2=第二新期數, 依此類推)
+        self.period_number = period_number
+
+        # 儲存要下載的多期資訊
+        self.periods_to_download = []
 
         # 初始化 ddddocr
         self.ocr = ddddocr.DdddOcr(show_ad=False)
@@ -75,7 +141,7 @@ class TakkyubinSeleniumScraper:
 
     def init_browser(self):
         """初始化瀏覽器"""
-        print("🚀 啟動瀏覽器...")
+        safe_print("🚀 啟動瀏覽器...")
 
         # Chrome 選項設定
         chrome_options = Options()
@@ -83,51 +149,102 @@ class TakkyubinSeleniumScraper:
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1280,720")
 
+        # 隱藏 Chrome 警告訊息
+        chrome_options.add_argument("--disable-logging")
+        chrome_options.add_argument("--log-level=3")
+        chrome_options.add_argument("--silent")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-gpu-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--remote-debugging-port=0")  # 隱藏 DevTools listening 訊息
+        chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        chrome_options.add_experimental_option('useAutomationExtension', False)
+        
+        # 設定自動下載權限，避免下載多個檔案時的權限提示
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--disable-features=TranslateUI")
+        chrome_options.add_argument("--disable-iframes-during-prerender")
+
         # 如果設定為無頭模式，添加 headless 參數
         if self.headless:
             chrome_options.add_argument("--headless")
-            print("🔇 使用無頭模式（不顯示瀏覽器視窗）")
+            safe_print("🔇 使用無頭模式（不顯示瀏覽器視窗）")
         else:
-            print("🖥️ 使用視窗模式（顯示瀏覽器）")
+            safe_print("🖥️ 使用視窗模式（顯示瀏覽器）")
 
         # 從環境變數讀取 Chrome 路徑（跨平台設定）
         chrome_binary_path = os.getenv('CHROME_BINARY_PATH')
         if chrome_binary_path:
             chrome_options.binary_location = chrome_binary_path
-            print(f"🌐 使用指定 Chrome 路徑: {chrome_binary_path}")
+            safe_print(f"🌐 使用指定 Chrome 路徑: {chrome_binary_path}")
         else:
-            print("⚠️ 未設定 CHROME_BINARY_PATH 環境變數，使用系統預設 Chrome")
+            safe_print("⚠️ 未設定 CHROME_BINARY_PATH 環境變數，使用系統預設 Chrome")
 
         # 設定下載路徑
         prefs = {
             "download.default_directory": str(self.download_dir.absolute()),
             "download.prompt_for_download": False,
             "download.directory_upgrade": True,
-            "safebrowsing.enabled": True
+            "safebrowsing.enabled": True,
+            "profile.default_content_setting_values.automatic_downloads": 1,  # 允許多個檔案自動下載
+            "profile.content_settings.exceptions.automatic_downloads.*.setting": 1  # 允許自動下載
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
-        # 使用 webdriver-manager 自動管理 ChromeDriver
-        try:
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
-            print("✅ 使用 WebDriver Manager 啟動 Chrome")
-        except Exception as e:
-            print(f"⚠️ WebDriver Manager 失敗，嘗試使用系統 Chrome: {e}")
+        # 初始化 Chrome 瀏覽器 (優先使用系統 Chrome)
+        self.driver = None
+
+        # 方法1: 嘗試使用 .env 中設定的 ChromeDriver 路徑
+        chromedriver_path = os.getenv('CHROMEDRIVER_PATH')
+        if chromedriver_path and os.path.exists(chromedriver_path):
             try:
-                self.driver = webdriver.Chrome(options=chrome_options)
-                print("✅ 使用系統 Chrome")
-            except Exception as e2:
-                print(f"❌ Chrome 啟動失敗: {e2}")
-                raise e2
+                service = Service(chromedriver_path)
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                safe_print(f"✅ 使用指定 ChromeDriver 啟動: {chromedriver_path}")
+            except Exception as env_error:
+                safe_print(f"⚠️ 指定的 ChromeDriver 路徑失敗: {env_error}")
+
+        # 方法2: 嘗試使用系統 ChromeDriver (通常最穩定)
+        if not self.driver:
+            try:
+                # 配置 Chrome Service 來隱藏輸出
+                if sys.platform == "win32":
+                    # Windows 上重導向 Chrome 輸出到 null
+                    service = Service()
+                    service.creation_flags = 0x08000000  # CREATE_NO_WINDOW
+                else:
+                    # Linux/macOS 使用 devnull
+                    service = Service(log_path=os.devnull)
+
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                safe_print("✅ 使用系統 Chrome 啟動")
+            except Exception as system_error:
+                safe_print(f"⚠️ 系統 Chrome 失敗: {system_error}")
+
+        # 方法3: 最後嘗試 WebDriver Manager (可能有架構問題)
+        if not self.driver:
+            try:
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=chrome_options)
+                safe_print("✅ 使用 WebDriver Manager 啟動 Chrome")
+            except Exception as wdm_error:
+                safe_print(f"⚠️ WebDriver Manager 失敗: {wdm_error}")
+
+        # 如果所有方法都失敗，拋出錯誤
+        if not self.driver:
+            error_msg = "❌ 所有 Chrome 啟動方法都失敗了！請檢查 Chrome 安裝或環境設定"
+            safe_print(error_msg)
+            raise RuntimeError(error_msg)
 
         self.wait = WebDriverWait(self.driver, 10)
-        print("✅ 瀏覽器初始化完成")
+        safe_print("✅ 瀏覽器初始化完成")
 
     def solve_captcha(self, captcha_img_element):
         """使用 ddddocr 自動識別驗證碼"""
         try:
-            print("🔍 使用 ddddocr 識別驗證碼...")
+            safe_print("🔍 使用 ddddocr 識別驗證碼...")
 
             # 截取驗證碼圖片
             screenshot = captcha_img_element.screenshot_as_png
@@ -135,41 +252,41 @@ class TakkyubinSeleniumScraper:
             # 使用 ddddocr 識別
             result = self.ocr.classification(screenshot)
 
-            print(f"✅ ddddocr 識別結果: {result}")
+            safe_print(f"✅ ddddocr 識別結果: {result}")
             return result
         except Exception as e:
-            print(f"❌ ddddocr 識別失敗: {e}")
+            safe_print(f"❌ ddddocr 識別失敗: {e}")
             return None
 
     def login(self):
         """執行登入流程"""
-        print("🌐 開始登入流程...")
+        safe_print("🌐 開始登入流程...")
 
         # 前往登入頁面
         self.driver.get(self.url)
         time.sleep(2)
-        print("✅ 登入頁面載入完成")
+        safe_print("✅ 登入頁面載入完成")
 
         # 填寫表單
         self.fill_login_form()
         submit_success = self.submit_login()
 
         if not submit_success:
-            print("❌ 登入失敗 - 表單提交有誤")
+            safe_print("❌ 登入失敗 - 表單提交有誤")
             return False
 
         # 檢查登入結果
         success = self.check_login_success()
         if success:
-            print("✅ 登入成功！")
+            safe_print("✅ 登入成功！")
             return True
         else:
-            print("❌ 登入失敗")
+            safe_print("❌ 登入失敗")
             return False
 
     def fill_login_form(self):
         """填寫登入表單"""
-        print("📝 填寫登入表單...")
+        safe_print("📝 填寫登入表單...")
 
         try:
             # 填入使用者帳號
@@ -178,13 +295,13 @@ class TakkyubinSeleniumScraper:
             )
             username_field.clear()
             username_field.send_keys(self.username)
-            print(f"✅ 已填入使用者帳號: {self.username}")
+            safe_print(f"✅ 已填入使用者帳號: {self.username}")
 
             # 填入密碼
             password_field = self.driver.find_element(By.ID, "txtUserPW")
             password_field.clear()
             password_field.send_keys(self.password)
-            print("✅ 已填入密碼")
+            safe_print("✅ 已填入密碼")
 
             # 處理驗證碼
             try:
@@ -216,15 +333,15 @@ class TakkyubinSeleniumScraper:
                     if captcha_field:
                         captcha_field.clear()
                         captcha_field.send_keys(captcha_text)
-                        print(f"✅ 已填入驗證碼: {captcha_text}")
+                        safe_print(f"✅ 已填入驗證碼: {captcha_text}")
                     else:
-                        print("⚠️ 找不到驗證碼輸入框")
+                        safe_print("⚠️ 找不到驗證碼輸入框")
                 else:
-                    print("⚠️ 無法自動識別驗證碼，等待手動輸入...")
+                    safe_print("⚠️ 無法自動識別驗證碼，等待手動輸入...")
                     time.sleep(10)  # 給用戶10秒手動輸入驗證碼
 
             except Exception as captcha_e:
-                print(f"⚠️ 處理驗證碼時發生錯誤: {captcha_e}")
+                safe_print(f"⚠️ 處理驗證碼時發生錯誤: {captcha_e}")
                 time.sleep(10)  # 給用戶手動處理的時間
 
             # 確保選擇「契約客戶專區 登入」
@@ -253,16 +370,16 @@ class TakkyubinSeleniumScraper:
 
                 if contract_radio and not contract_radio.is_selected():
                     contract_radio.click()
-                    print("✅ 已選擇契約客戶專區登入")
+                    safe_print("✅ 已選擇契約客戶專區登入")
                 elif contract_radio:
-                    print("✅ 契約客戶專區已預先選中")
+                    safe_print("✅ 契約客戶專區已預先選中")
                 else:
-                    print("⚠️ 無法找到契約客戶專區選項，使用預設值")
+                    safe_print("⚠️ 無法找到契約客戶專區選項，使用預設值")
             except Exception as e:
-                print(f"⚠️ 處理契約客戶專區選項時發生錯誤: {e}")
+                safe_print(f"⚠️ 處理契約客戶專區選項時發生錯誤: {e}")
 
         except Exception as e:
-            print(f"❌ 填寫表單失敗: {e}")
+            safe_print(f"❌ 填寫表單失敗: {e}")
 
     def submit_login(self):
         """提交登入表單"""
@@ -301,31 +418,31 @@ class TakkyubinSeleniumScraper:
                         continue
 
                 if error_messages:
-                    print(f"⚠️ 頁面錯誤訊息: {'; '.join(set(error_messages))}")
+                    safe_print(f"⚠️ 頁面錯誤訊息: {'; '.join(set(error_messages))}")
 
             except Exception as msg_e:
-                print(f"⚠️ 檢查錯誤訊息失敗: {msg_e}")
+                safe_print(f"⚠️ 檢查錯誤訊息失敗: {msg_e}")
 
             # 檢查是否有Alert彈窗
             try:
                 alert = self.driver.switch_to.alert
                 alert_text = alert.text
-                print(f"⚠️ 出現警告彈窗: {alert_text}")
+                safe_print(f"⚠️ 出現警告彈窗: {alert_text}")
                 alert.accept()  # 點擊確定
                 return False  # 登入失敗
             except:
                 pass  # 沒有Alert彈窗
 
-            print("✅ 表單已提交")
+            safe_print("✅ 表單已提交")
             return True
 
         except Exception as e:
-            print(f"❌ 提交表單失敗: {e}")
+            safe_print(f"❌ 提交表單失敗: {e}")
             return False
 
     def check_login_success(self):
         """檢查登入是否成功"""
-        print("🔐 檢查登入狀態...")
+        safe_print("🔐 檢查登入狀態...")
 
         current_url = self.driver.current_url
         current_title = self.driver.title
@@ -351,7 +468,7 @@ class TakkyubinSeleniumScraper:
                 found_failures.append(indicator)
 
         if found_failures:
-            print(f"⚠️ 發現登入失敗訊息: {', '.join(found_failures)}")
+            safe_print(f"⚠️ 發現登入失敗訊息: {', '.join(found_failures)}")
             return False
 
         # 檢查成功指標
@@ -363,25 +480,25 @@ class TakkyubinSeleniumScraper:
         # 檢查 URL 變化
         url_changed = current_url != self.url
 
-        print(f"🔍 登入檢查結果:")
+        safe_print(f"🔍 登入檢查結果:")
         print(f"   URL 是否改變: {'✅' if url_changed else '❌'}")
         print(f"   成功指標: {found_success if found_success else '無'}")
         print(f"   失敗指標: {found_failures if found_failures else '無'}")
 
         # 如果 URL 改變或找到成功指標，認為登入成功
         if url_changed or found_success:
-            print("✅ 登入成功，已進入系統")
+            safe_print("✅ 登入成功，已進入系統")
             return True
         else:
             # 截取部分頁面內容用於分析
             page_snippet = page_source[:1000] if len(page_source) > 1000 else page_source
-            print(f"⚠️ 頁面內容片段: ...{page_snippet[-200:] if len(page_snippet) > 200 else page_snippet}")
-            print("❌ 登入失敗或頁面異常")
+            safe_print(f"⚠️ 頁面內容片段: ...{page_snippet[-200:] if len(page_snippet) > 200 else page_snippet}")
+            safe_print("❌ 登入失敗或頁面異常")
             return False
 
     def navigate_to_payment_query(self):
         """導航到貨到付款查詢頁面 - 優先使用直接 URL"""
-        print("🧭 導航到貨到付款查詢頁面...")
+        safe_print("🧭 導航到貨到付款查詢頁面...")
 
         try:
             # 等待登入完成
@@ -396,21 +513,21 @@ class TakkyubinSeleniumScraper:
                 return True
 
             # 如果直接 URL 失敗，嘗試框架導航
-            print("⚠️ 直接 URL 失敗，嘗試框架導航...")
+            safe_print("⚠️ 直接 URL 失敗，嘗試框架導航...")
             frame_success = self._wait_for_frame_content()
             if frame_success:
                 return self._navigate_in_frame()
 
-            print("❌ 所有導航方法都失敗了")
+            safe_print("❌ 所有導航方法都失敗了")
             return False
 
         except Exception as e:
-            print(f"❌ 導航失敗: {e}")
+            safe_print(f"❌ 導航失敗: {e}")
             return False
 
     def _wait_for_frame_content(self):
         """等待框架內容載入並尋找導航元素"""
-        print("🔍 等待框架內容載入...")
+        safe_print("🔍 等待框架內容載入...")
 
         for attempt in range(30):  # 等待最多 30 秒
             try:
@@ -454,7 +571,7 @@ class TakkyubinSeleniumScraper:
                 time.sleep(1)
                 continue
 
-        print("❌ 框架內容載入超時")
+        safe_print("❌ 框架內容載入超時")
         return False
 
     def _find_payment_elements(self):
@@ -537,7 +654,7 @@ class TakkyubinSeleniumScraper:
             accounting_success = self._click_accounting_menu()
 
             if not accounting_success:
-                print("❌ 找不到帳務選單，嘗試直接尋找貨到付款選項...")
+                safe_print("❌ 找不到帳務選單，嘗試直接尋找貨到付款選項...")
                 payment_success = self._click_payment_option()
                 self.driver.switch_to.default_content()
                 return payment_success
@@ -551,7 +668,7 @@ class TakkyubinSeleniumScraper:
             return payment_success
 
         except Exception as e:
-            print(f"❌ 框架內導航失敗: {e}")
+            safe_print(f"❌ 框架內導航失敗: {e}")
             self.driver.switch_to.default_content()
             return False
 
@@ -729,7 +846,7 @@ class TakkyubinSeleniumScraper:
                     found_keywords = [kw for kw in success_keywords if kw in page_source]
 
                     if found_keywords:
-                        print(f"✅ 成功導航到: {current_url}")
+                        safe_print(f"✅ 成功導航到: {current_url}")
                         print(f"   找到關鍵字: {', '.join(found_keywords)}")
                         return True
                     else:
@@ -747,9 +864,9 @@ class TakkyubinSeleniumScraper:
 
         return False
 
-    def get_latest_settlement_period(self):
-        """獲取最新一期的結算區間 - 專門處理 ddlDate 選單"""
-        print("📅 查找最新結算區間...")
+    def get_settlement_periods_for_download(self):
+        """根據期數下載最新N期的結算區間 - 專門處理 ddlDate 選單"""
+        safe_print(f"📅 準備下載最新 {self.period_number} 期結算區間...")
 
         try:
             # 等待頁面載入
@@ -801,16 +918,29 @@ class TakkyubinSeleniumScraper:
                         date_keywords = ['202', '2025', '2024', '結算', '期間', '月']
 
                         if any(keyword in ' '.join(option_texts) for keyword in date_keywords):
-                            # 根據用戶指示：結算區間必須選擇第一個（非空選項）
+                            # 獲取所有有效的結算區間選項
                             valid_options = [opt for opt in options if opt.text.strip()]
 
                             if valid_options:
-                                first_valid_option = valid_options[0]
-                                period_text = first_valid_option.text.strip()
-                                print(f"   🎯 選擇第一個結算區間: {period_text}")
+                                # 確定實際要下載的期數
+                                actual_periods = min(self.period_number, len(valid_options))
+                                safe_print(f"   📋 找到 {len(valid_options)} 期可用，將下載最新 {actual_periods} 期")
 
+                                # 儲存所有要下載的期數資訊
+                                self.periods_to_download = []
+                                for i in range(actual_periods):
+                                    period_option = valid_options[i]
+                                    period_text = period_option.text.strip()
+                                    self.periods_to_download.append({
+                                        'option': period_option,
+                                        'text': period_text,
+                                        'index': i + 1
+                                    })
+                                    safe_print(f"      期數 {i+1}: {period_text}")
+
+                                selected_period = True
+                                # 先選擇第一期作為起始點
                                 try:
-                                    # 找到第一個有效選項的索引
                                     first_valid_index = None
                                     for idx, opt in enumerate(options):
                                         if opt.text.strip():
@@ -820,25 +950,13 @@ class TakkyubinSeleniumScraper:
                                     if first_valid_index is not None:
                                         select_obj.select_by_index(first_valid_index)
                                         time.sleep(2)
-                                        selected_period = True
-                                        # 儲存選中的結算區間
-                                        self.current_settlement_period = period_text
-                                        print("   ✅ 第一個結算區間選擇成功")
+                                        self.current_settlement_period = valid_options[0].text.strip()
+                                        safe_print(f"   ✅ 已選擇第 1 期作為起始: {self.current_settlement_period}")
                                         break
-
                                 except Exception as select_e:
-                                    print(f"   ❌ 選擇失敗: {select_e}")
-                                    # 嘗試直接點擊
-                                    try:
-                                        first_valid_option.click()
-                                        time.sleep(2)
-                                        selected_period = True
-                                        # 儲存選中的結算區間
-                                        self.current_settlement_period = period_text
-                                        print("   ✅ 第一個結算區間點擊成功")
-                                        break
-                                    except Exception as click_e:
-                                        print(f"   ❌ 點擊也失敗: {click_e}")
+                                    safe_print(f"   ❌ 選擇第 1 期失敗: {select_e}")
+                            else:
+                                safe_print("   ⚠️ 沒有找到有效的結算期間選項")
                         else:
                             print("   ⚠️ 選項不包含日期相關內容，跳過此選單")
 
@@ -847,12 +965,12 @@ class TakkyubinSeleniumScraper:
                     continue
 
             if not selected_period:
-                print("⚠️ 未能自動選擇結算期間，使用預設值繼續")
+                safe_print("⚠️ 未能自動選擇結算期間，使用預設值繼續")
 
             return selected_period
 
         except Exception as e:
-            print(f"❌ 獲取結算區間失敗: {e}")
+            safe_print(f"❌ 獲取結算區間失敗: {e}")
             return False
 
     def format_settlement_period_for_filename(self, period_text):
@@ -881,21 +999,21 @@ class TakkyubinSeleniumScraper:
                 safe_text = re.sub(r'[^\w\-]', '_', period_text)
                 return safe_text
         except Exception as e:
-            print(f"⚠️ 格式化結算期間失敗: {e}")
+            safe_print(f"⚠️ 格式化結算期間失敗: {e}")
             # 返回安全的檔案名
             safe_text = re.sub(r'[^\w\-]', '_', period_text)
             return safe_text
 
     def download_cod_statement(self):
         """下載貨到付款匯款明細表"""
-        print("📥 開始下載貨到付款匯款明細表...")
+        safe_print("📥 開始下載貨到付款匯款明細表...")
 
         try:
             # 等待頁面載入
             time.sleep(3)
 
             # 首先嘗試執行查詢（有些頁面需要先查詢才會顯示下載按鈕）
-            print("🔍 執行查詢...")
+            safe_print("🔍 執行查詢...")
 
             # 尋找並點擊查詢按鈕
             query_buttons_found = []
@@ -1005,7 +1123,7 @@ class TakkyubinSeleniumScraper:
                 print("   ❌ 未找到搜尋或查詢按鈕")
 
             # AJAX 載入完成後，尋找「對帳單下載」按鈕
-            print("🔍 尋找對帳單下載按鈕...")
+            safe_print("🔍 尋找對帳單下載按鈕...")
 
             # 專門尋找對帳單下載按鈕（基於用戶提供的確切元素）
             download_selectors = [
@@ -1080,7 +1198,7 @@ class TakkyubinSeleniumScraper:
             # 嘗試點擊下載按鈕
             download_success = False
             if download_buttons_found:
-                print(f"📥 找到 {len(download_buttons_found)} 個可能的下載按鈕")
+                safe_print(f"📥 找到 {len(download_buttons_found)} 個可能的下載按鈕")
 
                 # 優先點擊包含「對帳單」的按鈕
                 priority_buttons = [btn for btn in download_buttons_found if '對帳單' in btn['text']]
@@ -1098,6 +1216,41 @@ class TakkyubinSeleniumScraper:
                         # 點擊下載按鈕
                         self.driver.execute_script("arguments[0].click();", btn_info['element'])
                         print("   ✅ 下載按鈕已點擊，等待檔案下載...")
+                        
+                        # 檢查是否有瀏覽器下載權限對話框並處理
+                        try:
+                            time.sleep(2)  # 等待可能的對話框出現
+                            
+                            # 方法1：處理瀏覽器原生的權限對話框
+                            try:
+                                # 嘗試切換到可能的alert
+                                alert = self.driver.switch_to.alert
+                                alert_text = alert.text
+                                print(f"   🔔 發現瀏覽器對話框: {alert_text}")
+                                alert.accept()  # 點擊允許/確定
+                                print("   ✅ 已自動允許下載權限")
+                            except Exception:
+                                pass  # 沒有alert對話框
+                            
+                            # 方法2：處理Chrome的下載權限UI
+                            self.driver.execute_script("""
+                                // 自動點擊 "允許" 按鈕
+                                const allowButtons = document.querySelectorAll('button, [role="button"]');
+                                for (const button of allowButtons) {
+                                    const text = button.textContent || button.innerText || '';
+                                    if (text.includes('允許') || 
+                                        text.includes('Allow') ||
+                                        text.includes('允') ||
+                                        text.includes('下載') ||
+                                        text.includes('繼續')) {
+                                        button.click();
+                                        console.log('已點擊允許按鈕:', text);
+                                        break;
+                                    }
+                                }
+                            """)
+                        except Exception as dialog_e:
+                            pass  # 忽略對話框處理錯誤
 
                         # 等待下載完成
                         max_wait_time = 30  # 最多等待30秒
@@ -1131,8 +1284,8 @@ class TakkyubinSeleniumScraper:
 
             if download_success:
                 # 生成目標檔案名
-                period_suffix = self.format_settlement_period_for_filename(self.current_settlement_period)
-                target_filename = f"{self.username}_{period_suffix}.xlsx"
+                formatted_period = self.format_settlement_period_for_filename(self.current_settlement_period)
+                target_filename = f"{self.username}_{formatted_period}.xlsx"
                 target_file_path = self.download_dir / target_filename
 
                 # 如果目標檔案已存在，先刪除它
@@ -1160,14 +1313,14 @@ class TakkyubinSeleniumScraper:
                 return []
 
         except Exception as e:
-            print(f"❌ 下載失敗: {e}")
+            safe_print(f"❌ 下載失敗: {e}")
             return []
 
     def close(self):
         """關閉瀏覽器"""
         if self.driver:
             self.driver.quit()
-            print("🔚 瀏覽器已關閉")
+            safe_print("🔚 瀏覽器已關閉")
 
     def run_full_process(self):
         """執行完整的自動化流程"""
@@ -1176,7 +1329,7 @@ class TakkyubinSeleniumScraper:
 
         try:
             print("=" * 60)
-            print(f"🤖 開始執行黑貓宅急便自動下載流程 (帳號: {self.username})")
+            safe_print(f"🤖 開始執行黑貓宅急便自動下載流程 (帳號: {self.username})")
             print("=" * 60)
 
             # 1. 初始化瀏覽器
@@ -1185,7 +1338,7 @@ class TakkyubinSeleniumScraper:
             # 2. 登入
             login_success = self.login()
             if not login_success:
-                print(f"❌ 帳號 {self.username} 登入失敗")
+                safe_print(f"❌ 帳號 {self.username} 登入失敗")
                 return {
                     "success": False,
                     "username": self.username,
@@ -1196,7 +1349,7 @@ class TakkyubinSeleniumScraper:
             # 3. 導航到貨到付款查詢頁面
             nav_success = self.navigate_to_payment_query()
             if not nav_success:
-                print(f"❌ 帳號 {self.username} 導航失敗")
+                safe_print(f"❌ 帳號 {self.username} 導航失敗")
                 return {
                     "success": False,
                     "username": self.username,
@@ -1204,19 +1357,64 @@ class TakkyubinSeleniumScraper:
                     "downloads": []
                 }
 
-            # 4. 獲取最新結算期間
-            period_success = self.get_latest_settlement_period()
-            if not period_success:
-                print(f"⚠️ 帳號 {self.username} 未能選擇結算期間，但繼續執行")
+            # 4. 獲取要下載的多期結算期間資訊
+            periods_success = self.get_settlement_periods_for_download()
+            if not periods_success:
+                safe_print(f"⚠️ 帳號 {self.username} 未能獲取結算期間資訊，但嘗試繼續執行")
+                # 如果獲取期間失敗，嘗試下載預設的一期
+                downloaded_files = self.download_cod_statement()
+            else:
+                # 5. 逐一下載每期的貨到付款匯款明細表
+                safe_print(f"🎯 開始下載 {len(self.periods_to_download)} 期資料...")
 
-            # 5. 下載貨到付款匯款明細表
-            downloaded_files = self.download_cod_statement()
+                for period_info in self.periods_to_download:
+                    try:
+                        safe_print(f"📅 處理第 {period_info['index']} 期: {period_info['text']}")
+
+                        # 選擇當前期數
+                        self.current_settlement_period = period_info['text']
+
+                        # 重新選擇期數
+                        try:
+                            from selenium.webdriver.support.ui import Select
+                            # 尋找日期選單
+                            date_selects = self.driver.find_elements(By.NAME, "ddlDate")
+                            if not date_selects:
+                                date_selects = self.driver.find_elements(By.CSS_SELECTOR,
+                                    "select[name*='date'], select[name*='Date'], select[id*='date'], select[id*='Date']")
+
+                            for select_element in date_selects:
+                                select_obj = Select(select_element)
+                                options = select_obj.options
+
+                                # 找到對應的選項並選擇
+                                for option in options:
+                                    if option.text.strip() == period_info['text']:
+                                        select_obj.select_by_visible_text(period_info['text'])
+                                        time.sleep(2)
+                                        safe_print(f"   ✅ 已選擇期數: {period_info['text']}")
+                                        break
+                                break
+                        except Exception as select_e:
+                            safe_print(f"   ⚠️ 選擇期數失敗: {select_e}，繼續嘗試下載")
+
+                        # 下載當期資料
+                        period_files = self.download_cod_statement()
+                        if period_files:
+                            downloaded_files.extend(period_files)
+                            safe_print(f"   ✅ 第 {period_info['index']} 期下載完成: {len(period_files)} 個檔案")
+                        else:
+                            safe_print(f"   ⚠️ 第 {period_info['index']} 期未找到可下載的檔案")
+
+                    except Exception as period_e:
+                        safe_print(f"   ❌ 處理第 {period_info['index']} 期失敗: {period_e}")
+                        continue
 
             if downloaded_files:
-                print(f"🎉 帳號 {self.username} 自動化流程完成！下載了 {len(downloaded_files)} 個檔案")
+                safe_print(f"🎉 帳號 {self.username} 自動化流程完成！下載了 {len(downloaded_files)} 個檔案")
                 success = True
             else:
-                print(f"⚠️ 帳號 {self.username} 沒有下載到任何檔案")
+                safe_print(f"⚠️ 帳號 {self.username} 沒有下載到任何檔案")
 
             return {
                 "success": success,
@@ -1225,7 +1423,7 @@ class TakkyubinSeleniumScraper:
             }
 
         except Exception as e:
-            print(f"💥 帳號 {self.username} 流程執行失敗: {e}")
+            safe_print(f"💥 帳號 {self.username} 流程執行失敗: {e}")
             return {
                 "success": False,
                 "username": self.username,
@@ -1258,7 +1456,7 @@ class MultiAccountManager:
             if "accounts" not in self.config or not self.config["accounts"]:
                 raise ValueError("⛔ 設定檔中沒有找到帳號資訊！")
 
-            print(f"✅ 已載入設定檔: {self.config_file}")
+            safe_print(f"✅ 已載入設定檔: {self.config_file}")
 
         except json.JSONDecodeError as e:
             raise ValueError(f"⛔ 設定檔格式錯誤: {e}")
@@ -1269,7 +1467,7 @@ class MultiAccountManager:
         """取得啟用的帳號列表"""
         return [acc for acc in self.config["accounts"] if acc.get("enabled", True)]
 
-    def run_all_accounts(self, headless_override=None):
+    def run_all_accounts(self, headless_override=None, period_number=1):
         """執行所有啟用的帳號"""
         accounts = self.get_enabled_accounts()
         results = []
@@ -1287,14 +1485,20 @@ class MultiAccountManager:
             print("-" * 50)
 
             try:
-                # 如果有命令列參數覆寫，則使用該設定
-                use_headless = headless_override if headless_override is not None else settings.get("headless", False)
+                # 優先級：命令列參數（如果有指定）> 設定檔 > 預設值 False
+                if headless_override is not None:
+                    use_headless = headless_override
+                    safe_print(f"🔧 使用命令列 headless 設定: {use_headless}")
+                else:
+                    use_headless = settings.get("headless", False)
+                    safe_print(f"🔧 使用設定檔 headless 設定: {use_headless}")
 
                 scraper = TakkyubinSeleniumScraper(
                     username=username,
                     password=password,
                     headless=use_headless,
-                    download_base_dir=settings.get("download_base_dir", "downloads")
+                    download_base_dir=settings.get("download_base_dir", "downloads"),
+                    period_number=period_number
                 )
 
                 result = scraper.run_full_process()
@@ -1306,7 +1510,7 @@ class MultiAccountManager:
                     time.sleep(3)
 
             except Exception as e:
-                print(f"💥 帳號 {username} 處理失敗: {e}")
+                safe_print(f"💥 帳號 {username} 處理失敗: {e}")
                 results.append({
                     "success": False,
                     "username": username,
@@ -1329,7 +1533,7 @@ class MultiAccountManager:
         failed_accounts = [r for r in results if not r["success"]]
         total_downloads = sum(len(r["downloads"]) for r in results)
 
-        print(f"📊 執行統計:")
+        safe_print(f"📊 執行統計:")
         print(f"   總帳號數: {len(results)}")
         print(f"   成功帳號: {len(successful_accounts)}")
         print(f"   失敗帳號: {len(failed_accounts)}")
@@ -1374,6 +1578,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='黑貓宅急便自動下載工具')
     parser.add_argument('--headless', action='store_true', help='使用無頭模式')
+    parser.add_argument('--period', type=int, default=1, help='指定下載的期數 (1=最新一期, 2=第二新期數, 依此類推)')
 
     args = parser.parse_args()
 
@@ -1381,7 +1586,12 @@ def main():
         print("🐱 黑貓宅急便自動下載工具")
 
         manager = MultiAccountManager("accounts.json")
-        manager.run_all_accounts(headless_override=args.headless)
+        # 只有在使用者明確指定 --headless 時才覆蓋設定檔
+        headless_arg = True if '--headless' in sys.argv else None
+        manager.run_all_accounts(
+            headless_override=headless_arg,
+            period_number=args.period
+        )
 
         return 0
 

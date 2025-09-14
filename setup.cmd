@@ -1,29 +1,32 @@
 @echo off
-echo Installing Takkyubin Tool - Windows Compatible Version...
+chcp 65001 >nul
+echo 安裝宅急便工具 - Windows 相容版本...
 
-echo Step 1: Installing uv...
-pip install uv
+echo 步驟 1：檢查是否已安裝 uv...
+where uv >nul 2>nul
+if %errorlevel% neq 0 (
+    echo 找不到 uv。正在安裝 uv...
+    powershell -Command "irm https://astral.sh/uv/install.ps1 | iex"
+    echo 請重新啟動命令提示字元並再次執行此腳本。
+    pause
+    exit /b 1
+)
 
-echo Step 2: Creating virtual environment...
-uv venv
+echo 步驟 2：使用 uv 同步專案相依性...
+uv sync
 
-echo Step 3: Installing compatible versions for Windows...
-uv pip install selenium==4.15.0
-uv pip install webdriver-manager==4.0.1
-uv pip install requests==2.31.0
-uv pip install beautifulsoup4==4.12.2
-uv pip install openpyxl==3.1.2
-uv pip install python-dotenv==1.0.0
+echo 步驟 3：檢查安裝是否成功...
+uv run python --version
 
-echo Step 4: Installing ddddocr with compatible ONNX version...
-uv pip install ddddocr==1.4.7
-uv pip install onnxruntime==1.15.1
-
-echo Step 5: If above fails, trying CPU-only version...
-uv pip uninstall -y onnxruntime
-uv pip install onnxruntime-cpu==1.15.1
-
-echo Setup complete! 
-echo If you still get DLL errors, please install:
-echo Microsoft Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe
+echo.
+echo 安裝完成！
+echo.
+echo 執行工具：
+echo   uv run takkyubin_selenium_scraper.py
+echo   或
+echo   uv run takkyubin_selenium_scraper.py --headless
+echo.
+echo 如果遇到 DLL 錯誤，請安裝：
+echo Microsoft Visual C++ 可轉散發套件：https://aka.ms/vs/17/release/vc_redist.x64.exe
+echo.
 pause

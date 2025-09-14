@@ -18,21 +18,24 @@ if [ ! -d ".venv" ]; then
     uv venv
 fi
 
-# 檢查 requirements.txt 是否存在並安裝依賴
-if [ -f "requirements.txt" ]; then
-    echo "📦 安裝依賴套件..."
-    uv pip install -r requirements.txt
-fi
+# 同步依賴套件
+echo "📦 同步依賴套件..."
+uv sync
 
-# 檢查參數並執行
-if [ "$1" = "download" ] || [ -z "$1" ]; then
-    echo "📥 執行黑貓宅急便自動下載貨到付款匯款明細表"
-    uv run python takkyubin_selenium_scraper.py "${@:2}"  # 傳遞除了第一個參數外的所有參數
+# 直接執行下載功能
+echo "📥 執行黑貓宅急便自動下載貨到付款匯款明細表"
+# 設定環境變數確保即時輸出
+export PYTHONUNBUFFERED=1
+echo ""
+echo "📅 請輸入要下載的期數 (例如: 1 表示下載最新1期, 3 表示下載最新3期)"
+echo "   直接按 Enter 使用預設值 (最新一期)"
+read -p "期數: " period_number
+
+# 如果使用者沒有輸入，使用預設值
+if [ -z "$period_number" ]; then
+    echo "📅 使用預設值 (下載最新1期)"
+    uv run python -u takkyubin_selenium_scraper.py "$@"  # 傳遞所有參數
 else
-    echo "使用方式："
-    echo "  ./run.sh                      - 執行自動下載貨到付款匯款明細表"
-    echo "  ./run.sh --headless          - 背景模式執行"
-    echo ""
-    echo "或直接使用："
-    echo "  uv run python takkyubin_selenium_scraper.py [選項]"
+    echo "📅 使用指定期數: 下載最新 $period_number 期"
+    uv run python -u takkyubin_selenium_scraper.py --period "$period_number" "$@"  # 傳遞所有參數
 fi

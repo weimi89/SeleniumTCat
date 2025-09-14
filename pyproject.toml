@@ -12,6 +12,8 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "ddddocr==1.4.7",
     "onnxruntime==1.15.1",
+    "pillow<10.0.0",
+    "numpy<2.0.0",
 ]
 
 [tool.uv]

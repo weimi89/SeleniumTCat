@@ -31,19 +31,19 @@ check_python() {
 # 安裝 Python (macOS)
 install_python_macos() {
     echo "🔧 在 macOS 上安裝 Python..."
-    
+
     # 檢查 Homebrew
     if ! command -v brew &> /dev/null; then
         echo "📦 安裝 Homebrew..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        
+
         # 添加 Homebrew 到 PATH (適用於 Apple Silicon)
         if [[ $(uname -m) == "arm64" ]]; then
             echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
             eval "$(/opt/homebrew/bin/brew shellenv)"
         fi
     fi
-    
+
     echo "🐍 使用 Homebrew 安裝 Python..."
     brew install python3
 }
@@ -51,7 +51,7 @@ install_python_macos() {
 # 安裝 Python (Linux)
 install_python_linux() {
     echo "🔧 在 Linux 上安裝 Python..."
-    
+
     # 檢測 Linux 發行版
     if command -v apt-get &> /dev/null; then
         # Ubuntu/Debian
@@ -80,20 +80,20 @@ install_python_linux() {
 # 安裝 uv
 install_uv() {
     echo "⚡ 安裝 uv (Python 套件管理工具)..."
-    
+
     if ! command -v uv &> /dev/null; then
         curl -LsSf https://astral.sh/uv/install.sh | sh
-        
+
         # 添加 uv 到當前 session 的 PATH
         export PATH="$HOME/.cargo/bin:$PATH"
-        
+
         # 添加到 shell profile
         if [[ "$SHELL" == */zsh ]]; then
             echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.zshrc
         elif [[ "$SHELL" == */bash ]]; then
             echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> ~/.bashrc
         fi
-        
+
         # 重新檢查
         if command -v uv &> /dev/null; then
             echo "✅ uv 安裝成功"
@@ -110,7 +110,7 @@ install_uv() {
 # 設定 Chrome 路徑
 setup_chrome() {
     echo "🌐 設定 Chrome 瀏覽器路徑..."
-    
+
     if [ ! -f ".env" ]; then
         if [[ "$OS" == "macOS" ]]; then
             CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
@@ -129,7 +129,7 @@ setup_chrome() {
                 CHROME_PATH=""
             fi
         fi
-        
+
         if [ ! -z "$CHROME_PATH" ]; then
             echo "CHROME_BINARY_PATH=\"$CHROME_PATH\"" > .env
             echo "✅ Chrome 路徑設定完成: $CHROME_PATH"
@@ -142,19 +142,19 @@ setup_chrome() {
 # 初始化專案
 setup_project() {
     echo "📦 初始化專案環境..."
-    
+
     # 建立虛擬環境
     uv venv
-    
+
     # 安裝依賴
-    if [ -f "requirements.txt" ]; then
-        echo "📦 安裝 Python 套件..."
-        uv pip install -r requirements.txt
-        echo "✅ Python 套件安裝完成"
-    fi
-    
+    echo "📦 安裝 Python 套件..."
+    uv sync
+    echo "✅ Python 套件安裝完成"
+
     # 確保 run.sh 可執行
-    chmod +x run.sh
+    if [ -f "run.sh" ]; then
+        chmod +x run.sh
+    fi
 }
 
 # 主安裝流程
@@ -162,7 +162,7 @@ main() {
     echo ""
     echo "🚀 開始安裝流程..."
     echo ""
-    
+
     # Step 1: 檢查並安裝 Python
     if ! check_python; then
         if [[ "$OS" == "macOS" ]]; then
@@ -170,23 +170,23 @@ main() {
         elif [[ "$OS" == "Linux" ]]; then
             install_python_linux
         fi
-        
+
         # 重新檢查
         if ! check_python; then
             echo "❌ Python 安裝失敗，請手動安裝後再試"
             exit 1
         fi
     fi
-    
+
     # Step 2: 安裝 uv
     install_uv
-    
+
     # Step 3: 設定 Chrome
     setup_chrome
-    
+
     # Step 4: 初始化專案
     setup_project
-    
+
     echo ""
     echo "🎉 安裝完成！"
     echo "=========================================="

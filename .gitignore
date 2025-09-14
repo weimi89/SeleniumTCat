@@ -1,46 +1,167 @@
-# 虛擬環境
-venv/
-env/
-.venv/
-.env
+# ======================
+# Python 相關
+# ======================
 
 # Python 快取檔案
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
 
-# UV 檔案
-uv.lock
+# 分發 / 打包
+.Python
+build/
+develop-eggs/
+dist/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# 下載檔案和報告
+# PyInstaller
+*.manifest
+*.spec
+
+# 單元測試 / 覆蓋率報告
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# ======================
+# 虛擬環境
+# ======================
+venv/
+env/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ======================
+# 環境設定檔案
+# ======================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 但保留範例檔案
+!.env.example
+
+# ======================
+# 專案特定檔案
+# ======================
+
+# 帳號憑證和本地設定（保留範例檔案）
+accounts.json
+!accounts.json.example
+
+# 本地設定檔案
+.claude/settings.local.json
+
+# 下載的檔案
 downloads/*.xlsx
 downloads/*.xls
-reports/*.json
-logs/*.log
 
-# 設定檔案（包含敏感資訊）
-accounts.json
+# 但保留目錄結構
+!downloads/.gitkeep
+
+# 執行報告
+reports/*.json
+reports/*.html
+!reports/.gitkeep
+
+# 日誌檔案
+logs/*.log
+logs/*.txt
+!logs/.gitkeep
+
+# 暫存檔案
+temp/*
+tmp/*
+!temp/.gitkeep
+!tmp/.gitkeep
+
+# Chrome WebDriver 相關
+chromedriver
+chromedriver.exe
 
 # 截圖檔案
 *.png
+screenshots/
 
-# 抓取的資料檔案（舊版）
-scraped_data_*.json
-scraped_summary_*.json
-
+# ======================
 # 系統檔案
+# ======================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
 
-# 編輯器檔案
+# ======================
+# 編輯器和IDE
+# ======================
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# 日誌檔案
-*.log
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
 
-# 暫存檔案
-temp/
-tmp/
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# ======================
+# 其他工具
+# ======================
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
