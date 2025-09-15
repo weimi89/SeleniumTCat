@@ -12,14 +12,14 @@
 
 ### 主要元件
 
-1. **PaymentScraper** (`payment_scraper.py`): 核心自動化類別
+1. **PaymentScraper** (`src/scrapers/payment_scraper.py`): 核心自動化類別
    - 處理 Chrome WebDriver 瀏覽器初始化
    - 管理登入流程，整合 ddddocr 自動驗證碼識別
    - 導航到貨到付款查詢頁面
    - 自動選擇最新一期結算區間
    - 下載貨到付款匯款明細表 Excel 檔案
 
-2. **MultiAccountManager** (`payment_scraper.py`): 批次處理管理器
+2. **MultiAccountManager** (`src/scrapers/payment_scraper.py`): 批次處理管理器
    - 處理 `accounts.json` 中的多個帳號
    - 產生整合的總結報告
    - 管理順序執行和錯誤處理
@@ -65,13 +65,13 @@ uv pip install -r requirements.txt
 ./run_takkyubin.sh download-headless  # 無頭模式
 
 # 直接使用 uv 執行 Python
-uv run payment_scraper.py
+uv run src/scrapers/payment_scraper.py
 
 # 無頭模式
-uv run payment_scraper.py --headless
+uv run src/scrapers/payment_scraper.py --headless
 
 # 傳統 Python 執行（如果環境已啟動）
-python payment_scraper.py
+python src/scrapers/payment_scraper.py
 ```
 
 ### 執行舊版 WEDI 工具（參考用）

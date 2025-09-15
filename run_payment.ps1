@@ -31,26 +31,6 @@ try {
     # 設定 PYTHONPATH 並執行 Python 程式
     $env:PYTHONPATH = $PWD.Path
     
-    # 檢查是否有 --headless 參數
-    $isHeadless = $args -contains "--headless"
-    
-    # 詢問是否要使用無頭模式（如果命令列沒有指定）
-    if (-not $isHeadless -and -not ($args -contains "--window")) {
-        Write-Host "📋 執行模式選擇" -ForegroundColor Yellow
-        Write-Host "1. 視窗模式 - 可看到瀏覽器操作過程"
-        Write-Host "2. 無頭模式 - 後台執行，速度較快"
-        Write-Host ""
-        
-        $modeChoice = Read-Host "請選擇執行模式 (1/2，預設: 1)"
-        
-        if ($modeChoice -eq "2") {
-            $args += "--headless"
-            Write-Host "✅ 將使用無頭模式執行" -ForegroundColor Green
-        } else {
-            Write-Host "✅ 將使用視窗模式執行" -ForegroundColor Green
-        }
-        Write-Host ""
-    }
     
     # 詢問下載期數（如果命令列沒有指定）
     if (-not ($args -contains "--period")) {
@@ -74,7 +54,7 @@ try {
     }
     
     # 顯示執行命令
-    $commandStr = "uv run python -u payment_scraper.py"
+    $commandStr = "uv run python -u src/scrapers/payment_scraper.py"
     if ($args.Count -gt 0) {
         $commandStr += " " + ($args -join " ")
     }
@@ -82,7 +62,7 @@ try {
     Write-Host ""
     
     # 執行 Python 程式
-    & uv run python -u payment_scraper.py @args
+    & uv run python -u src/scrapers/payment_scraper.py @args
     
     # 檢查執行結果
     Test-ExecutionResult -ExitCode $LASTEXITCODE
