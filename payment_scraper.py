@@ -61,18 +61,18 @@ if not os.environ.get('PYTHONUNBUFFERED'):
         print("")
         print("   推薦方式2 - Windows 命令提示字元:")
         print("   set PYTHONUNBUFFERED=1")
-        print("   python -u takkyubin_selenium_scraper.py")
+        print("   python -u payment_scraper.py")
         print("")
         print("   推薦方式3 - PowerShell:")
         print("   $env:PYTHONUNBUFFERED='1'")
-        print("   python -u takkyubin_selenium_scraper.py")
+        print("   python -u payment_scraper.py")
     else:
         print("   推薦方式 - 使用 shell 腳本:")
         print("   ./run_takkyubin.sh download")
         print("")
         print("   或手動設定:")
         print("   export PYTHONUNBUFFERED=1")
-        print("   python -u takkyubin_selenium_scraper.py")
+        print("   python -u payment_scraper.py")
     print("")
     safe_print("❌ 程式將退出，請使用上述方式重新執行")
     sys.exit(1)
@@ -97,7 +97,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-class TakkyubinSeleniumScraper:
+class PaymentScraper:
     """
     使用 Selenium 的黑貓宅急便自動登入抓取工具
     """
@@ -159,7 +159,7 @@ class TakkyubinSeleniumScraper:
         chrome_options.add_argument("--remote-debugging-port=0")  # 隱藏 DevTools listening 訊息
         chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
         chrome_options.add_experimental_option('useAutomationExtension', False)
-        
+
         # 設定自動下載權限，避免下載多個檔案時的權限提示
         chrome_options.add_argument("--disable-features=VizDisplayCompositor")
         chrome_options.add_argument("--allow-running-insecure-content")
@@ -1216,11 +1216,11 @@ class TakkyubinSeleniumScraper:
                         # 點擊下載按鈕
                         self.driver.execute_script("arguments[0].click();", btn_info['element'])
                         print("   ✅ 下載按鈕已點擊，等待檔案下載...")
-                        
+
                         # 檢查是否有瀏覽器下載權限對話框並處理
                         try:
                             time.sleep(2)  # 等待可能的對話框出現
-                            
+
                             # 方法1：處理瀏覽器原生的權限對話框
                             try:
                                 # 嘗試切換到可能的alert
@@ -1231,14 +1231,14 @@ class TakkyubinSeleniumScraper:
                                 print("   ✅ 已自動允許下載權限")
                             except Exception:
                                 pass  # 沒有alert對話框
-                            
+
                             # 方法2：處理Chrome的下載權限UI
                             self.driver.execute_script("""
                                 // 自動點擊 "允許" 按鈕
                                 const allowButtons = document.querySelectorAll('button, [role="button"]');
                                 for (const button of allowButtons) {
                                     const text = button.textContent || button.innerText || '';
-                                    if (text.includes('允許') || 
+                                    if (text.includes('允許') ||
                                         text.includes('Allow') ||
                                         text.includes('允') ||
                                         text.includes('下載') ||
@@ -1493,7 +1493,7 @@ class MultiAccountManager:
                     use_headless = settings.get("headless", False)
                     safe_print(f"🔧 使用設定檔 headless 設定: {use_headless}")
 
-                scraper = TakkyubinSeleniumScraper(
+                scraper = PaymentScraper(
                     username=username,
                     password=password,
                     headless=use_headless,

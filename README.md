@@ -98,7 +98,7 @@ cp .env.example .env
 ./run.sh
 
 # 或直接使用 uv 執行
-uv run python takkyubin_selenium_scraper.py
+uv run python payment_scraper.py
 ```
 
 **Windows 系統**：
@@ -107,7 +107,7 @@ uv run python takkyubin_selenium_scraper.py
 run.cmd
 
 # 或直接使用虛擬環境執行
-.venv\Scripts\python.exe takkyubin_selenium_scraper.py
+.venv\Scripts\python.exe payment_scraper.py
 ```
 
 ## 使用方式
@@ -123,7 +123,7 @@ run.cmd
 ./run.sh --headless
 
 # 或直接使用 uv
-uv run python takkyubin_selenium_scraper.py --headless
+uv run python payment_scraper.py --headless
 ```
 
 **Windows**：
@@ -132,10 +132,10 @@ uv run python takkyubin_selenium_scraper.py --headless
 run.cmd
 
 # 無頭模式（背景執行）
-.venv\Scripts\python.exe takkyubin_selenium_scraper.py --headless
+.venv\Scripts\python.exe payment_scraper.py --headless
 
 # 或直接執行
-python takkyubin_selenium_scraper.py --headless
+python payment_scraper.py --headless
 ```
 
 ### 自動執行流程
@@ -223,17 +223,17 @@ CHROME_BINARY_PATH="/usr/bin/google-chrome"
 
 ### 🔧 常見問題
 
-**Q: Chrome 瀏覽器啟動失敗**  
+**Q: Chrome 瀏覽器啟動失敗**
 A: 檢查 `.env` 檔案中的 `CHROME_BINARY_PATH` 是否正確
 
-**Q: Windows 顯示「DLL load failed」或 ddddocr 錯誤**  
-A: 1) 安裝 Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe  
+**Q: Windows 顯示「DLL load failed」或 ddddocr 錯誤**
+A: 1) 安裝 Visual C++ Redistributable: https://aka.ms/vs/17/release/vc_redist.x64.exe
    2) 重新執行 `setup.cmd`（已內建修復機制）
 
-**Q: Windows 顯示「No module named 'dotenv'」**  
+**Q: Windows 顯示「No module named 'dotenv'」**
 A: 虛擬環境未正確安裝，重新執行 `setup.cmd`
 
-**Q: ddddocr 驗證碼識別失敗**  
+**Q: ddddocr 驗證碼識別失敗**
 A: 程式會自動等待手動輸入，或檢查 ddddocr 套件是否正確安裝
 
 **Q: 導航到貨到付款頁面失敗**

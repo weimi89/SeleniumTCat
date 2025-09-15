@@ -21,7 +21,7 @@ dev-dependencies = []
 
 [tool.hatch.build.targets.wheel]
 include = [
-    "takkyubin_selenium_scraper.py",
+    "payment_scraper.py",
     "accounts.json",
     ".env",
 ]

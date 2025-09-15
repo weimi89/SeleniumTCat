@@ -151,9 +151,21 @@ setup_project() {
     uv sync
     echo "✅ Python 套件安裝完成"
 
-    # 確保 run.sh 可執行
-    if [ -f "run.sh" ]; then
-        chmod +x run.sh
+    # 確保腳本可執行
+    if [ -f "run_payment.sh" ]; then
+        chmod +x run_payment.sh
+    fi
+    
+    # 建立帳號設定範例
+    if [ ! -f "accounts.json" ]; then
+        if [ -f "accounts.json.example" ]; then
+            cp "accounts.json.example" "accounts.json"
+            echo "✅ 已從範例建立 accounts.json 檔案"
+        else
+            echo "⚠️ 未找到 accounts.json.example，請手動建立 accounts.json"
+        fi
+    else
+        echo "✅ accounts.json 檔案已存在"
     fi
 }
 
@@ -194,9 +206,9 @@ main() {
     echo "📝 下一步:"
     echo "1. 編輯 accounts.json 設定您的帳號資訊"
     echo "2. 執行程式:"
-    echo "   ./run.sh"
+    echo "   ./run_payment.sh"
     echo ""
-    echo "需要幫助？請查看 README.md"
+    echo "需要幫助？請查看 CLAUDE.md 或 README.md"
 }
 
 # 執行主程式

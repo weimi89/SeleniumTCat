@@ -12,20 +12,20 @@
 
 ### 主要元件
 
-1. **TakkyubinSeleniumScraper** (`takkyubin_selenium_scraper.py`): 核心自動化類別
+1. **PaymentScraper** (`payment_scraper.py`): 核心自動化類別
    - 處理 Chrome WebDriver 瀏覽器初始化
    - 管理登入流程，整合 ddddocr 自動驗證碼識別
    - 導航到貨到付款查詢頁面
    - 自動選擇最新一期結算區間
    - 下載貨到付款匯款明細表 Excel 檔案
 
-2. **MultiAccountManager** (`takkyubin_selenium_scraper.py`): 批次處理管理器
+2. **MultiAccountManager** (`payment_scraper.py`): 批次處理管理器
    - 處理 `accounts.json` 中的多個帳號
    - 產生整合的總結報告
    - 管理順序執行和錯誤處理
 
-3. **舊版 WEDI 工具**: 
-   - `wedi_selenium_scraper.py`: 原本的宅配通系統工具（保留作為參考）
+3. **舊版 WEDI 工具**:
+   - `wedi_payment_scraper.py`: 原本的宅配通系統工具（保留作為參考）
 
 ### 關鍵技術細節
 
@@ -65,13 +65,13 @@ uv pip install -r requirements.txt
 ./run_takkyubin.sh download-headless  # 無頭模式
 
 # 直接使用 uv 執行 Python
-uv run takkyubin_selenium_scraper.py
+uv run payment_scraper.py
 
 # 無頭模式
-uv run takkyubin_selenium_scraper.py --headless
+uv run payment_scraper.py --headless
 
 # 傳統 Python 執行（如果環境已啟動）
-python takkyubin_selenium_scraper.py
+python payment_scraper.py
 ```
 
 ### 執行舊版 WEDI 工具（參考用）
@@ -80,7 +80,7 @@ python takkyubin_selenium_scraper.py
 ./run.sh download
 
 # 直接執行
-uv run wedi_selenium_scraper.py --start-date 20241201 --end-date 20241208
+uv run wedi_payment_scraper.py --start-date 20241201 --end-date 20241208
 ```
 
 ### 設定檔案
