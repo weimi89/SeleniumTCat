@@ -21,7 +21,7 @@ dev-dependencies = []
 
 [tool.hatch.build.targets.wheel]
 include = [
-    "payment_scraper.py",
+    "src/scrapers/payment_scraper.py",
     "accounts.json",
     ".env",
 ]

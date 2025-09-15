@@ -98,7 +98,7 @@ cp .env.example .env
 ./run.sh
 
 # 或直接使用 uv 執行
-uv run python payment_scraper.py
+uv run python src/scrapers/payment_scraper.py
 ```
 
 **Windows 系統**：
@@ -107,7 +107,7 @@ uv run python payment_scraper.py
 run.cmd
 
 # 或直接使用虛擬環境執行
-.venv\Scripts\python.exe payment_scraper.py
+.venv\Scripts\python.exe src\scrapers\payment_scraper.py
 ```
 
 ## 使用方式
@@ -123,7 +123,7 @@ run.cmd
 ./run.sh --headless
 
 # 或直接使用 uv
-uv run python payment_scraper.py --headless
+uv run python src/scrapers/payment_scraper.py --headless
 ```
 
 **Windows**：
@@ -132,10 +132,10 @@ uv run python payment_scraper.py --headless
 run.cmd
 
 # 無頭模式（背景執行）
-.venv\Scripts\python.exe payment_scraper.py --headless
+.venv\Scripts\python.exe src\scrapers\payment_scraper.py --headless
 
 # 或直接執行
-python payment_scraper.py --headless
+python src/scrapers/payment_scraper.py --headless
 ```
 
 ### 自動執行流程
