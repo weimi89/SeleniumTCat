@@ -75,31 +75,48 @@ class BaseScraper:
             safe_print(f"❌ ddddocr 識別失敗: {e}")
             return None
 
-    def login(self):
-        """執行登入流程"""
+    def login(self, max_attempts=3):
+        """執行登入流程，支援多次重試"""
         safe_print("🌐 開始登入流程...")
 
-        # 前往登入頁面
-        self.driver.get(self.url)
-        time.sleep(2)
-        safe_print("✅ 登入頁面載入完成")
+        for attempt in range(1, max_attempts + 1):
+            safe_print(f"🔄 第 {attempt}/{max_attempts} 次登入嘗試")
+            
+            # 前往登入頁面
+            self.driver.get(self.url)
+            time.sleep(2)
+            safe_print("✅ 登入頁面載入完成")
 
-        # 填寫表單
-        self.fill_login_form()
-        submit_success = self.submit_login()
+            # 填寫表單
+            form_success = self.fill_login_form()
+            if not form_success:
+                safe_print(f"❌ 第 {attempt} 次嘗試 - 表單填寫失敗")
+                if attempt < max_attempts:
+                    safe_print("🔄 準備重試...")
+                    time.sleep(2)
+                continue
 
-        if not submit_success:
-            safe_print("❌ 登入失敗 - 表單提交有誤")
-            return False
+            submit_success = self.submit_login()
+            if not submit_success:
+                safe_print(f"❌ 第 {attempt} 次嘗試 - 表單提交失敗")
+                if attempt < max_attempts:
+                    safe_print("🔄 準備重試...")
+                    time.sleep(2)
+                continue
 
-        # 檢查登入結果
-        success = self.check_login_success()
-        if success:
-            safe_print("✅ 登入成功！")
-            return True
-        else:
-            safe_print("❌ 登入失敗")
-            return False
+            # 檢查登入結果
+            success = self.check_login_success()
+            if success:
+                safe_print(f"✅ 第 {attempt} 次嘗試成功登入！")
+                return True
+            else:
+                safe_print(f"❌ 第 {attempt} 次嘗試登入失敗")
+                if attempt < max_attempts:
+                    safe_print("🔄 準備重試...")
+                    time.sleep(3)  # 稍微增加重試間隔
+
+        safe_print(f"❌ 經過 {max_attempts} 次嘗試後仍然登入失敗")
+        return False
 
     def fill_login_form(self):
         """填寫登入表單"""
@@ -121,13 +138,18 @@ class BaseScraper:
             safe_print("✅ 已填入密碼")
 
             # 處理驗證碼
-            self._handle_captcha()
+            captcha_success = self._handle_captcha()
+            if not captcha_success:
+                safe_print("❌ 驗證碼處理失敗")
+                return False
 
             # 確保選擇「契約客戶專區 登入」
             self._select_contract_customer_login()
+            return True
 
         except Exception as e:
             safe_print(f"❌ 填寫表單失敗: {e}")
+            return False
 
     def _handle_captcha(self):
         """處理驗證碼輸入"""
@@ -161,15 +183,17 @@ class BaseScraper:
                     captcha_field.clear()
                     captcha_field.send_keys(captcha_text)
                     safe_print(f"✅ 已填入驗證碼: {captcha_text}")
+                    return True
                 else:
                     safe_print("⚠️ 找不到驗證碼輸入框")
+                    return False
             else:
-                safe_print("⚠️ 無法自動識別驗證碼，等待手動輸入...")
-                time.sleep(10)  # 給用戶10秒手動輸入驗證碼
+                safe_print("⚠️ ddddocr 無法識別驗證碼")
+                return False
 
         except Exception as captcha_e:
             safe_print(f"⚠️ 處理驗證碼時發生錯誤: {captcha_e}")
-            time.sleep(10)  # 給用戶手動處理的時間
+            return False
 
     def _select_contract_customer_login(self):
         """選擇契約客戶專區登入"""
