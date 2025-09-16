@@ -157,7 +157,7 @@ class MultiAccountManager:
 
         # 保存詳細報告
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        report_filename = f"takkyubin_report_{timestamp}.json"
+        report_filename = f"{timestamp}.json"
         report_file = Path("reports") / report_filename
 
         # 確保 reports 目錄存在
