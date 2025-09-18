@@ -24,9 +24,9 @@ cd /d "%~dp0"
 REM 優先順序：PowerShell 7 > 舊版 PowerShell
 where /q pwsh
 if %ERRORLEVEL% == 0 (
-    pwsh -NoProfile -Command "& './PowerShell_更新.ps1'"
+    pwsh -NoProfile -Command "& (Join-Path $PWD 'PowerShell_更新.ps1')"
 ) else (
-    powershell -NoProfile -Command "& './PowerShell_更新.ps1'"
+    powershell -NoProfile -Command "& (Join-Path $PWD 'PowerShell_更新.ps1')"
 )
 
 REM 檢查更新結果
