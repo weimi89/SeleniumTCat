@@ -22,8 +22,8 @@ REM 切換到腳本目錄
 pushd "%~dp0"
 
 REM 檢查 PowerShell 腳本是否存在
-if not exist "PowerShell_更新.ps1" (
-    echo ❌ 錯誤：找不到 PowerShell_更新.ps1 檔案
+if not exist "scripts\update.ps1" (
+    echo ❌ 錯誤：找不到 scripts\update.ps1 檔案
     echo 📁 當前目錄：%CD%
     pause
     exit /b 1
@@ -33,10 +33,10 @@ REM 優先順序：PowerShell 7 > 舊版 PowerShell
 where /q pwsh
 if %ERRORLEVEL% == 0 (
     echo 🚀 使用 PowerShell 7 進行更新...
-    pwsh -NoProfile -WorkingDirectory "%CD%" -File "PowerShell_更新.ps1"
+    pwsh -NoProfile -WorkingDirectory "%CD%" -File "scripts\update.ps1"
 ) else (
     echo 🚀 使用傳統 PowerShell 進行更新...
-    powershell -NoProfile -Command "Set-Location '%CD%'; & '.\PowerShell_更新.ps1'"
+    powershell -NoProfile -Command "Set-Location '%CD%'; & '.\scripts\update.ps1'"
 )
 
 popd
