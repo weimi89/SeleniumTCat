@@ -960,7 +960,17 @@ class FreightScraper(BaseScraper):
 
             except Exception as e:
                 safe_print(f"⚠️ 檔案重命名失敗 {file_path.name}: {e}")
-                renamed_files.append(file_path)  # 保留原始檔案
+                # 即使重命名失敗，也要確保檔案有唯一名稱
+                try:
+                    import uuid
+                    backup_filename = f"發票明細_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
+                    backup_file_path = file_path.parent / backup_filename
+                    file_path.rename(backup_file_path)
+                    renamed_files.append(backup_file_path)
+                    safe_print(f"🔄 使用備用檔案名: {backup_filename}")
+                except Exception as backup_e:
+                    safe_print(f"❌ 備用重命名也失敗: {backup_e}")
+                    renamed_files.append(file_path)  # 最後手段：保留原始檔案
 
         return renamed_files
 
@@ -992,7 +1002,17 @@ class FreightScraper(BaseScraper):
 
             except Exception as e:
                 safe_print(f"⚠️ 檔案重命名失敗 {file_path.name}: {e}")
-                renamed_files.append(file_path)  # 保留原始檔案
+                # 即使重命名失敗，也要確保檔案有唯一名稱
+                try:
+                    import uuid
+                    backup_filename = f"運費明細_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
+                    backup_file_path = file_path.parent / backup_filename
+                    file_path.rename(backup_file_path)
+                    renamed_files.append(backup_file_path)
+                    safe_print(f"🔄 使用備用檔案名: {backup_filename}")
+                except Exception as backup_e:
+                    safe_print(f"❌ 備用重命名也失敗: {backup_e}")
+                    renamed_files.append(file_path)  # 最後手段：保留原始檔案
 
         return renamed_files
 
