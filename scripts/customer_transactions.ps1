@@ -5,14 +5,15 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # 確保在正確的專案目錄
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptPath
+$projectPath = Split-Path -Parent $scriptPath
+Set-Location $projectPath
 
 Write-Host "🐱 黑貓宅急便交易明細表自動下載工具" -ForegroundColor Cyan
 Write-Host "======================================" -ForegroundColor Cyan
 Write-Host ""
 
 # 載入共用檢查函數
-$commonChecksPath = Join-Path $PSScriptRoot "scripts\common_checks.ps1"
+$commonChecksPath = Join-Path $PSScriptRoot "common_checks.ps1"
 if (Test-Path $commonChecksPath) {
     . $commonChecksPath
 } else {
