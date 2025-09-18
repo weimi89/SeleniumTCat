@@ -7,16 +7,16 @@ cd /d "%~dp0"
 rem 優先用 Windows Terminal
 where wt >nul 2>&1
 if %errorlevel%==0 (
-  wt -w 0 -p "PowerShell" "pwsh" -NoExit -ExecutionPolicy Bypass -Command "& (Join-Path $PWD 'PowerShell_客樂得對帳單.ps1')" %*
+  wt -w 0 -p "PowerShell" "pwsh" -NoExit -ExecutionPolicy Bypass -Command "& '.\PowerShell_客樂得對帳單.ps1'" %*
   exit /b
 )
 
 rem 如果沒裝 Windows Terminal，直接用 pwsh
 where pwsh >nul 2>&1
 if %errorlevel%==0 (
-  start "" pwsh -NoExit -ExecutionPolicy Bypass -Command "& (Join-Path $PWD 'PowerShell_客樂得對帳單.ps1')" %*
+  start "" pwsh -NoExit -ExecutionPolicy Bypass -Command "& '.\PowerShell_客樂得對帳單.ps1'" %*
   exit /b
 )
 
 rem 備援舊版 PowerShell
-start "" powershell -NoExit -ExecutionPolicy Bypass -Command "& (Join-Path $PWD 'PowerShell_客樂得對帳單.ps1')" %*
+start "" powershell -NoExit -ExecutionPolicy Bypass -Command "& '.\PowerShell_客樂得對帳單.ps1'" %*
