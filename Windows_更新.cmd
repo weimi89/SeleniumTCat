@@ -18,15 +18,16 @@ if not exist ".git" (
 echo 🔧 正在啟動 PowerShell 進行更新...
 echo.
 
-REM 使用相對路徑避免中文路徑問題
-cd /d "%~dp0"
+REM 建立完整路徑
+set "SCRIPT_DIR=%~dp0"
+set "SCRIPT_PATH=%SCRIPT_DIR%PowerShell_更新.ps1"
 
 REM 優先順序：PowerShell 7 > 舊版 PowerShell
 where /q pwsh
 if %ERRORLEVEL% == 0 (
-    pwsh -NoProfile -Command "& '.\PowerShell_更新.ps1'"
+    pwsh -NoProfile -Command "Set-Location '%SCRIPT_DIR%'; & '%SCRIPT_PATH%'"
 ) else (
-    powershell -NoProfile -Command "& '.\PowerShell_更新.ps1'"
+    powershell -NoProfile -Command "Set-Location '%SCRIPT_DIR%'; & '%SCRIPT_PATH%'"
 )
 
 REM 檢查更新結果
