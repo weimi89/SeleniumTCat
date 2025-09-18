@@ -25,12 +25,25 @@ SeleniumTCat/
 │       └── windows_encoding_utils.py  # Windows 相容性工具
 ├── scripts/                      # 共用腳本
 │   ├── common_checks.ps1         # PowerShell 共用檢查函數
-│   └── common_checks.sh          # Shell 共用檢查函數
-├── run_payment.sh/.cmd/.ps1      # 貨到付款執行腳本
-├── run_freight.sh/.cmd/.ps1      # 運費查詢執行腳本
-├── run_unpaid.sh/.cmd/.ps1       # 交易明細表執行腳本
-├── update.sh/.cmd/.ps1          # 自動更新腳本
+│   ├── common_checks.sh          # Shell 共用檢查函數
+│   └── common_checks.cmd         # CMD 共用檢查函數
+├── Linux_客樂得對帳單.sh          # Linux 貨到付款執行腳本
+├── Linux_發票明細.sh             # Linux 運費查詢執行腳本
+├── Linux_客戶交易明細.sh          # Linux 交易明細表執行腳本
+├── Linux_安裝.sh                # Linux 自動安裝腳本
+├── Linux_更新.sh                # Linux 自動更新腳本
+├── Windows_客樂得對帳單.cmd       # Windows 貨到付款執行腳本
+├── Windows_發票明細.cmd          # Windows 運費查詢執行腳本
+├── Windows_客戶交易明細.cmd       # Windows 交易明細表執行腳本
+├── Windows_安裝.cmd             # Windows 自動安裝腳本
+├── Windows_更新.cmd             # Windows 自動更新腳本
+├── PowerShell_客樂得對帳單.ps1    # PowerShell 貨到付款執行腳本
+├── PowerShell_發票明細.ps1       # PowerShell 運費查詢執行腳本
+├── PowerShell_客戶交易明細.ps1    # PowerShell 交易明細表執行腳本
+├── PowerShell_安裝.ps1          # PowerShell 自動安裝腳本
+├── PowerShell_更新.ps1          # PowerShell 自動更新腳本
 ├── accounts.json                 # 帳號設定檔
+├── accounts.json.example         # 帳號設定檔範例
 ├── pyproject.toml               # Python 專案設定
 └── uv.lock                      # 鎖定依賴版本
 ```
@@ -211,9 +224,9 @@ PYTHONPATH="$(pwd)" uv run python -u src/scrapers/unpaid_scraper.py
 ## 輸出結構
 
 - **downloads/**: 按帳號下載的 Excel 檔案
-  - 貨到付款：`{username}_{payment_no}.xlsx`
-  - 運費對帳單：`{username}_{發票日期}_{發票號碼}.xlsx`
-  - 交易明細表：`{username}_{開始日期}_{結束日期}.xlsx`
+  - 貨到付款：`客樂得對帳單_{帳號}_{結算期間}.xlsx`
+  - 運費對帳單：`發票明細_{帳號}_{發票日期}_{發票號碼}.xlsx`
+  - 交易明細表：`交易明細表_{帳號}_{開始日期}-{結束日期}.xlsx`
 - **reports/**: 個別帳號執行報告（目前版本已停用）
 - **logs/**: 執行日誌和除錯資訊
 - **temp/**: 暫存處理檔案

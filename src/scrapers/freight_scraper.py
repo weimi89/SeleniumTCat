@@ -653,10 +653,10 @@ class FreightScraper(BaseScraper):
                 if invoice_data:
                     first_invoice = invoice_data[0]
                     # 格式：{帳號}_{發票日期}_{發票號碼}
-                    new_name = f"{self.username}_{first_invoice['invoice_date']}_{first_invoice['invoice_number']}{extension}"
+                    new_name = f"發票明細_{self.username}_{first_invoice['invoice_date']}_{first_invoice['invoice_number']}{extension}"
                 else:
                     # 備用格式：使用日期範圍
-                    new_name = f"{self.username}_{self.start_date}-{self.end_date}_{original_name}{extension}"
+                    new_name = f"發票明細_{self.username}_{self.start_date}-{self.end_date}_{original_name}{extension}"
 
                 new_path = file_path.parent / new_name
 

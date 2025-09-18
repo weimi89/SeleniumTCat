@@ -31,17 +31,28 @@ SeleniumTCat/
 │   │   ├── freight_scraper.py    # 運費查詢工具
 │   │   └── unpaid_scraper.py     # 交易明細表工具
 │   └── utils/                    # 工具模組
-│       ├── windows_encoding_utils.py  # Windows 相容性工具
-│       └── debug_captcha.py      # 驗證碼調試工具
+│       └── windows_encoding_utils.py  # Windows 相容性工具
 ├── scripts/                      # 共用腳本
 │   ├── common_checks.ps1         # PowerShell 共用檢查函數
-│   └── common_checks.sh          # Shell 共用檢查函數
-├── run_payment.sh/.cmd/.ps1      # 貨到付款執行腳本
-├── run_freight.sh/.cmd/.ps1      # 運費查詢執行腳本
-├── run_unpaid.sh/.cmd/.ps1       # 交易明細表執行腳本
-├── setup.sh/.cmd/.ps1           # 自動安裝腳本
-├── update.sh/.cmd/.ps1          # 自動更新腳本
+│   ├── common_checks.sh          # Shell 共用檢查函數
+│   └── common_checks.cmd         # CMD 共用檢查函數
+├── Linux_客樂得對帳單.sh          # Linux 貨到付款執行腳本
+├── Linux_發票明細.sh             # Linux 運費查詢執行腳本
+├── Linux_客戶交易明細.sh          # Linux 交易明細表執行腳本
+├── Linux_安裝.sh                # Linux 自動安裝腳本
+├── Linux_更新.sh                # Linux 自動更新腳本
+├── Windows_客樂得對帳單.cmd       # Windows 貨到付款執行腳本
+├── Windows_發票明細.cmd          # Windows 運費查詢執行腳本
+├── Windows_客戶交易明細.cmd       # Windows 交易明細表執行腳本
+├── Windows_安裝.cmd             # Windows 自動安裝腳本
+├── Windows_更新.cmd             # Windows 自動更新腳本
+├── PowerShell_客樂得對帳單.ps1    # PowerShell 貨到付款執行腳本
+├── PowerShell_發票明細.ps1       # PowerShell 運費查詢執行腳本
+├── PowerShell_客戶交易明細.ps1    # PowerShell 交易明細表執行腳本
+├── PowerShell_安裝.ps1          # PowerShell 自動安裝腳本
+├── PowerShell_更新.ps1          # PowerShell 自動更新腳本
 ├── accounts.json                 # 帳號設定檔
+├── accounts.json.example         # 帳號設定檔範例
 ├── pyproject.toml               # Python 專案設定
 └── uv.lock                      # 鎖定依賴版本
 ```
@@ -54,16 +65,16 @@ SeleniumTCat/
 
 **Linux/macOS**：
 ```bash
-./update.sh
+./Linux_更新.sh
 ```
 
 **Windows**：
 ```cmd
 # 雙擊執行或在命令提示字元中執行（自動啟動 PowerShell 7）
-update.cmd
+Windows_更新.cmd
 
 # 或直接執行 PowerShell 7 腳本
-update.ps1
+PowerShell_更新.ps1
 ```
 
 ### 更新功能特色
@@ -125,16 +136,16 @@ winget install --id Microsoft.Powershell --source winget
 **macOS/Linux**：
 ```bash
 # 下載並執行自動安裝
-chmod +x setup.sh && ./setup.sh
+chmod +x Linux_安裝.sh && ./Linux_安裝.sh
 ```
 
 **Windows**：
 ```cmd
 # 雙擊執行或在命令提示字元中執行（自動啟動 PowerShell 7）
-setup.cmd
+Windows_安裝.cmd
 
 # 或直接執行 PowerShell 7 腳本
-setup.ps1
+PowerShell_安裝.ps1
 ```
 
 安裝腳本會自動：
@@ -178,21 +189,21 @@ cp .env.example .env
 **推薦使用方式 (跨平台腳本)**：
 ```bash
 # macOS/Linux
-./run_payment.sh
+./Linux_客樂得對帳單.sh
 
 # Windows（自動啟動 PowerShell 7）
-run_payment.cmd
+Windows_客樂得對帳單.cmd
 
 # 或直接使用 PowerShell 7 腳本
-run_payment.ps1
+PowerShell_客樂得對帳單.ps1
 
 # 指定下載期數
-./run_payment.sh --period 3      # Linux/macOS
-run_payment.cmd --period 3       # Windows
+./Linux_客樂得對帳單.sh --period 3      # Linux/macOS
+Windows_客樂得對帳單.cmd --period 3       # Windows
 
 # 無頭模式
-./run_payment.sh --headless      # Linux/macOS
-run_payment.cmd --headless       # Windows
+./Linux_客樂得對帳單.sh --headless      # Linux/macOS
+Windows_客樂得對帳單.cmd --headless       # Windows
 ```
 
 **手動執行**：
@@ -211,21 +222,21 @@ uv run python -u src\scrapers\payment_scraper.py
 **推薦使用方式 (跨平台腳本)**：
 ```bash
 # macOS/Linux
-./run_freight.sh
+./Linux_發票明細.sh
 
 # Windows（自動啟動 PowerShell 7）
-run_freight.cmd
+Windows_發票明細.cmd
 
 # 或直接使用 PowerShell 7 腳本
-run_freight.ps1
+PowerShell_發票明細.ps1
 
 # 指定日期範圍
-./run_freight.sh --start-date 20241201 --end-date 20241208   # Linux/macOS
-run_freight.cmd --start-date 20241201 --end-date 20241208    # Windows
+./Linux_發票明細.sh --start-date 20241201 --end-date 20241208   # Linux/macOS
+Windows_發票明細.cmd --start-date 20241201 --end-date 20241208    # Windows
 
 # 無頭模式
-./run_freight.sh --headless      # Linux/macOS
-run_freight.cmd --headless       # Windows
+./Linux_發票明細.sh --headless      # Linux/macOS
+Windows_發票明細.cmd --headless       # Windows
 ```
 
 **手動執行**：
@@ -244,21 +255,21 @@ uv run python -u src\scrapers\freight_scraper.py
 **推薦使用方式 (跨平台腳本)**：
 ```bash
 # macOS/Linux
-./run_unpaid.sh
+./Linux_客戶交易明細.sh
 
 # Windows（自動啟動 PowerShell 7）
-run_unpaid.cmd
+Windows_客戶交易明細.cmd
 
 # 或直接使用 PowerShell 7 腳本
-run_unpaid.ps1
+PowerShell_客戶交易明細.ps1
 
 # 指定週期數量
-./run_unpaid.sh --periods 3      # Linux/macOS
-run_unpaid.cmd --periods 3       # Windows
+./Linux_客戶交易明細.sh --periods 3      # Linux/macOS
+Windows_客戶交易明細.cmd --periods 3       # Windows
 
 # 無頭模式
-./run_unpaid.sh --headless       # Linux/macOS
-run_unpaid.cmd --headless        # Windows
+./Linux_客戶交易明細.sh --headless       # Linux/macOS
+Windows_客戶交易明細.cmd --headless        # Windows
 ```
 
 **手動執行**：
@@ -281,7 +292,7 @@ uv run python -u src\scrapers\unpaid_scraper.py
 4. 📅 **期數選擇** - 自動選擇指定期數或最新一期結算區間
 5. 🔍 **執行查詢** - 點擊搜尋按鈕並等待 AJAX 載入完成
 6. 📥 **自動下載** - 點擊下載按鈕下載 Excel 檔案
-7. 📝 **智能重命名** - 檔案重命名為 `{帳號}_{payment_no}.xlsx` 格式
+7. 📝 **智能重命名** - 檔案重命名為 `客樂得對帳單_{帳號}_{結算期間}.xlsx` 格式
 8. 👥 **多帳號處理** - 依序處理所有啟用的帳號
 9. 📋 **生成報告** - 產生詳細的執行報告
 
@@ -292,7 +303,7 @@ uv run python -u src\scrapers\unpaid_scraper.py
 4. 📅 **日期設定** - 設定發票日期區間（YYYYMMDD 格式）
 5. 🔍 **AJAX 搜尋** - 執行搜尋並等待結果載入
 6. 📥 **自動下載** - 下載明細檔案
-7. 📝 **智能重命名** - 檔案重命名為 `{帳號}_{發票日期}_{發票號碼}.xlsx` 格式
+7. 📝 **智能重命名** - 檔案重命名為 `發票明細_{帳號}_{發票日期}_{發票號碼}.xlsx` 格式
 8. 👥 **批次處理** - 處理所有啟用的帳號
 9. 📋 **總結報告** - 產生執行統計和結果報告
 
@@ -303,7 +314,7 @@ uv run python -u src\scrapers\unpaid_scraper.py
 4. 📅 **週期計算** - 自動計算各週期的日期範圍（預設 2 期，每期 7 天）
 5. 🔍 **AJAX 搜尋** - 針對每個週期執行搜尋請求
 6. 📥 **批次下載** - 下載各週期的明細檔案
-7. 📝 **智能重命名** - 檔案重命名為 `{帳號}_{開始日期}_{結束日期}.xlsx` 格式
+7. 📝 **智能重命名** - 檔案重命名為 `交易明細表_{帳號}_{開始日期}-{結束日期}.xlsx` 格式
 8. 👥 **批次處理** - 處理所有啟用的帳號
 9. 📋 **總結報告** - 產生執行統計和結果報告
 
@@ -312,16 +323,16 @@ uv run python -u src\scrapers\unpaid_scraper.py
 下載的檔案會自動重命名為：
 
 ### 貨到付款匯款明細
-- **格式**: `{帳號}_{payment_no}.xlsx`
-- **範例**: `0000000063_P202409040001.xlsx`
+- **格式**: `客樂得對帳單_{帳號}_{結算期間}.xlsx`
+- **範例**: `客樂得對帳單_0000000063_202409-1.xlsx`
 
 ### 運費對帳單明細
-- **格式**: `{帳號}_{發票日期}_{發票號碼}.xlsx`
-- **範例**: `0000000063_20240904_AB12345678.xlsx`
+- **格式**: `發票明細_{帳號}_{發票日期}_{發票號碼}.xlsx`
+- **範例**: `發票明細_0000000063_20240904_AB12345678.xlsx`
 
 ### 交易明細表
-- **格式**: `{帳號}_{開始日期}_{結束日期}.xlsx`
-- **範例**: `0000000063_20240901_20240907.xlsx`
+- **格式**: `交易明細表_{帳號}_{開始日期}-{結束日期}.xlsx`
+- **範例**: `交易明細表_0000000063_20240901-20240907.xlsx`
 
 > **覆蓋策略**: 重複執行會直接覆蓋同名檔案，保持目錄整潔
 
@@ -329,9 +340,9 @@ uv run python -u src\scrapers\unpaid_scraper.py
 
 ```
 downloads/              # 下載的 Excel 檔案
-├── 0000000063_P202409040001.xlsx         # 貨到付款明細
-├── 0000000063_20240904_AB12345678.xlsx   # 運費對帳單明細
-├── 0000000063_20240901_20240907.xlsx     # 交易明細表
+├── 客樂得對帳單_0000000063_202409-1.xlsx         # 貨到付款明細
+├── 發票明細_0000000063_20240904_AB12345678.xlsx   # 運費對帳單明細
+├── 交易明細表_0000000063_20240901-20240907.xlsx     # 交易明細表
 └── ...
 
 reports/               # 執行報告

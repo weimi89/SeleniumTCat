@@ -641,7 +641,7 @@ class UnpaidScraper(BaseScraper):
         return []
 
     def _rename_period_files(self, downloaded_files, start_date, end_date):
-        """重命名下載的檔案（格式：{帳號}_{開始日期}_{結束日期}）"""
+        """重命名下載的檔案（格式：{帳號}_{開始日期}-{結束日期}）"""
         renamed_files = []
 
         for file_path in downloaded_files:
@@ -649,16 +649,13 @@ class UnpaidScraper(BaseScraper):
                 original_name = file_path.stem
                 extension = file_path.suffix
 
-                # 新的檔案名稱格式：{帳號}_{開始日期}_{結束日期}
-                new_name = f"{self.username}_{start_date}_{end_date}{extension}"
+                # 新的檔案名稱格式：{帳號}_{開始日期}-{結束日期}
+                new_name = f"交易明細表_{self.username}_{start_date}-{end_date}{extension}"
                 new_path = file_path.parent / new_name
 
-                # 如果目標檔案已存在，添加序號
-                counter = 1
-                while new_path.exists():
-                    base_name = f"{self.username}_{start_date}_{end_date}_{counter}{extension}"
-                    new_path = file_path.parent / base_name
-                    counter += 1
+                # 如果目標檔案已存在，直接覆蓋
+                if new_path.exists():
+                    safe_print(f"⚠️ 檔案已存在，將覆蓋: {new_path.name}")
 
                 file_path.rename(new_path)
                 renamed_files.append(new_path)

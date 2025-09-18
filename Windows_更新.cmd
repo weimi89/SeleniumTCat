@@ -21,9 +21,9 @@ echo.
 REM 優先順序：PowerShell 7 > 舊版 PowerShell
 where /q pwsh
 if %ERRORLEVEL% == 0 (
-    pwsh -NoProfile -Command "& '%~dp0update.ps1'"
+    pwsh -NoProfile -Command "& '%~dp0PowerShell_更新.ps1'"
 ) else (
-    powershell -NoProfile -Command "& '%~dp0update.ps1'"
+    powershell -NoProfile -Command "& '%~dp0PowerShell_更新.ps1'"
 )
 
 REM 檢查更新結果

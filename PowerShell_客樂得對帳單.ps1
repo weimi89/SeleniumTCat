@@ -30,8 +30,8 @@ Write-Host ""
 try {
     # 設定 PYTHONPATH 並執行 Python 程式
     $env:PYTHONPATH = $PWD.Path
-    
-    
+
+
     # 詢問下載期數（如果命令列沒有指定）
     if (-not ($args -contains "--period")) {
         Write-Host "📅 下載範圍設定" -ForegroundColor Yellow
@@ -40,9 +40,9 @@ try {
         Write-Host "• 3 = 下載最新 3 期"
         Write-Host "• 0 或空白 = 下載最新 1 期（預設）"
         Write-Host ""
-        
+
         $periodInput = Read-Host "期數"
-        
+
         if ($periodInput -and $periodInput -match '^\d+$' -and [int]$periodInput -gt 0) {
             $args += "--period"
             $args += $periodInput
@@ -52,7 +52,7 @@ try {
         }
         Write-Host ""
     }
-    
+
     # 顯示執行命令
     $commandStr = "uv run python -u src/scrapers/payment_scraper.py"
     if ($args.Count -gt 0) {
@@ -60,13 +60,13 @@ try {
     }
     Write-Host "🚀 執行命令: $commandStr" -ForegroundColor Blue
     Write-Host ""
-    
+
     # 執行 Python 程式
     & uv run python -u src/scrapers/payment_scraper.py @args
-    
+
     # 檢查執行結果
     Test-ExecutionResult -ExitCode $LASTEXITCODE
-    
+
 } catch {
     Write-Host "❌ 執行過程中發生錯誤：$($_.Exception.Message)" -ForegroundColor Red
     Test-ExecutionResult -ExitCode 1
