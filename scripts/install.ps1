@@ -6,7 +6,8 @@ $OutputEncoding = [System.Text.Encoding]::UTF8
 
 # 確保在正確的專案目錄
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Set-Location $scriptPath
+$projectPath = Split-Path -Parent $scriptPath
+Set-Location $projectPath
 
 Write-Host "🔧 安裝黑貓宅急便自動下載工具 - PowerShell 版本" -ForegroundColor Cyan
 Write-Host "===============================================" -ForegroundColor Cyan
