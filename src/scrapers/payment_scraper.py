@@ -51,7 +51,7 @@ class PaymentScraper(BaseScraper):
         safe_print("🧭 導航到貨到付款查詢頁面...")
 
         max_attempts = 3  # 最多嘗試 3 次
-        
+
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
@@ -118,7 +118,7 @@ class PaymentScraper(BaseScraper):
                         home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
                         self.driver.get(home_url)
                         time.sleep(3)
-                        
+
                         # 檢查是否需要重新登入
                         if 'Login.aspx' in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
@@ -441,15 +441,15 @@ class PaymentScraper(BaseScraper):
 
         for url_index, url in enumerate(direct_urls):
             print(f"   嘗試 URL {url_index + 1}/{len(direct_urls)}: {url}")
-            
+
             for retry in range(max_retries + 1):
                 if retry > 0:
                     print(f"      重試 {retry}/{max_retries}...")
-                
+
                 try:
                     self.driver.get(url)
                     time.sleep(2)  # 短暫等待以檢測 alert
-                    
+
                     # 處理可能的 alert 彈窗
                     alert_result = self._handle_alerts()
                     if alert_result == "SECURITY_WARNING":
@@ -457,9 +457,9 @@ class PaymentScraper(BaseScraper):
                         return False  # 終止當前帳號處理
                     elif alert_result:
                         print("   🔔 處理了安全提示或其他彈窗")
-                    
+
                     time.sleep(3)  # 等待頁面完全載入
-                    
+
                     current_url = self.driver.current_url
                     page_source = self.driver.page_source
 
@@ -480,8 +480,8 @@ class PaymentScraper(BaseScraper):
                             continue
 
                     # 檢查是否成功（不是錯誤頁面）
-                    if (not any(error_page in current_url for error_page in 
-                               ['ErrorMsg.aspx', 'Login.aspx', 'MsgCenter.aspx']) and 
+                    if (not any(error_page in current_url for error_page in
+                               ['ErrorMsg.aspx', 'Login.aspx', 'MsgCenter.aspx']) and
                         current_url != self.url):
 
                         # 檢查頁面內容是否包含相關關鍵字
@@ -534,13 +534,19 @@ class PaymentScraper(BaseScraper):
             timeout_indicators = [
                 'MsgCenter.aspx',
                 '系統閒置過久',
-                '請重新登入',
-                'TimeOut',
-                'Session'
+                '請重新登入'
             ]
 
-            # 檢查 URL
+            # 檢查 URL - 使用更精確的檢查
             if any(indicator in current_url for indicator in timeout_indicators):
+                return True
+
+            # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
+            if 'TimeOut=Y' in current_url:
+                return True
+
+            # 檢查其他 Session 相關但排除正常情況
+            if 'Session' in current_url and 'SessionExpired' in current_url:
                 return True
 
             # 檢查頁面內容
@@ -588,7 +594,7 @@ class PaymentScraper(BaseScraper):
             ]
 
             login_success = False
-            
+
             for login_url in login_urls:
                 try:
                     print(f"   嘗試登入 URL: {login_url}")
@@ -601,15 +607,15 @@ class PaymentScraper(BaseScraper):
                     # 檢查是否成功到達登入頁面
                     if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
                         print("   ✅ 成功到達登入頁面")
-                        
+
                         # 重新執行登入流程
                         login_success = self.login()
                         if login_success:
                             safe_print("✅ 會話超時後重新登入成功")
-                            
+
                             # 等待登入完成並驗證
                             time.sleep(5)
-                            
+
                             # 驗證登入是否真的成功
                             if not self._check_session_timeout():
                                 print("   ✅ 登入驗證成功，會話有效")
@@ -630,24 +636,24 @@ class PaymentScraper(BaseScraper):
 
             if not login_success:
                 safe_print("❌ 所有重新登入嘗試都失敗")
-                
+
                 # 最後嘗試：重新初始化瀏覽器會話
                 try:
                     safe_print("🔄 嘗試重新初始化瀏覽器會話...")
-                    
+
                     # 刪除所有 cookies
                     self.driver.delete_all_cookies()
-                    
+
                     # 回到首頁
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
                     time.sleep(3)
-                    
+
                     # 再次嘗試登入
                     final_login_success = self.login()
                     if final_login_success:
                         safe_print("✅ 重新初始化後登入成功")
                         return True
-                        
+
                 except Exception as reinit_e:
                     safe_print(f"❌ 重新初始化失敗: {reinit_e}")
 
@@ -749,15 +755,15 @@ class PaymentScraper(BaseScraper):
                             single_option = options[0]
                             option_value = single_option.get_attribute('value')
                             option_text = single_option.text.strip()
-                            
+
                             # 如果只有一個選項且 value="~" 或包含無資料關鍵字
-                            if (option_value == "~" or 
+                            if (option_value == "~" or
                                 any(keyword in option_text for keyword in ['無日期區間可供查詢', '無資料', '沒有資料', '無可用資料', '無日期區間'])):
                                 safe_print(f"   ℹ️ 該帳號只有一個選項且為無資料狀態: '{option_text}' (value: {option_value})")
                                 safe_print("   ⏭️ 跳過此帳號，沒有可下載的資料")
                                 self.current_settlement_period = None
                                 return "NO_DATA_AVAILABLE"
-                        
+
                         # 檢查是否只有「無日期區間可供查詢」或類似的無資料選項
                         no_data_keywords = ['無日期區間可供查詢', '無資料', '沒有資料', '無可用資料', '無日期區間']
 
@@ -766,9 +772,9 @@ class PaymentScraper(BaseScraper):
                         for opt in options:
                             text = opt.text.strip()
                             option_value = opt.get_attribute('value')
-                            
+
                             # 排除 value="~" 的選項和包含無資料關鍵字的選項
-                            if (text and option_value != "~" and 
+                            if (text and option_value != "~" and
                                 not any(keyword in text for keyword in no_data_keywords)):
                                 # 檢查是否包含有效的日期資訊
                                 if any(keyword in text for keyword in date_keywords):

@@ -47,7 +47,7 @@ class UnpaidScraper(BaseScraper):
         safe_print("🧭 導航到交易明細表頁面...")
 
         max_attempts = 3  # 最多嘗試 3 次
-        
+
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
@@ -112,7 +112,7 @@ class UnpaidScraper(BaseScraper):
                         home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
                         self.driver.get(home_url)
                         time.sleep(3)
-                        
+
                         # 檢查是否需要重新登入
                         if 'Login.aspx' in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
@@ -148,15 +148,15 @@ class UnpaidScraper(BaseScraper):
 
             for url_index, full_url in enumerate(direct_urls):
                 safe_print(f"🎯 嘗試 URL {url_index + 1}/{len(direct_urls)}: {full_url}")
-                
+
                 for retry in range(max_retries + 1):
                     if retry > 0:
                         print(f"      重試 {retry}/{max_retries}...")
-                    
+
                     try:
                         self.driver.get(full_url)
                         time.sleep(2)  # 短暫等待以檢測 alert
-                        
+
                         # 處理可能的 alert 彈窗
                         alert_result = self._handle_alerts()
                         if alert_result == "SECURITY_WARNING":
@@ -164,9 +164,9 @@ class UnpaidScraper(BaseScraper):
                             return False  # 終止當前帳號處理
                         elif alert_result:
                             print("   🔔 處理了安全提示或其他彈窗")
-                        
+
                         time.sleep(3)  # 等待頁面完全載入
-                        
+
                         current_url = self.driver.current_url
                         print(f"   導航後 URL: {current_url}")
 
@@ -402,11 +402,11 @@ class UnpaidScraper(BaseScraper):
             # 檢查 URL - 特別處理 TimeOut 參數
             if any(indicator in current_url for indicator in timeout_indicators):
                 return True
-            
+
             # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
             if 'TimeOut=Y' in current_url:
                 return True
-            
+
             # 檢查其他 Session 相關但排除正常情況
             if 'Session' in current_url and 'SessionExpired' in current_url:
                 return True
@@ -456,7 +456,7 @@ class UnpaidScraper(BaseScraper):
             ]
 
             login_success = False
-            
+
             for login_url in login_urls:
                 try:
                     print(f"   嘗試登入 URL: {login_url}")
@@ -469,15 +469,15 @@ class UnpaidScraper(BaseScraper):
                     # 檢查是否成功到達登入頁面
                     if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
                         print("   ✅ 成功到達登入頁面")
-                        
+
                         # 重新執行登入流程
                         login_success = self.login()
                         if login_success:
                             safe_print("✅ 會話超時後重新登入成功")
-                            
+
                             # 等待登入完成並驗證
                             time.sleep(5)
-                            
+
                             # 驗證登入是否真的成功
                             if not self._check_session_timeout():
                                 print("   ✅ 登入驗證成功，會話有效")
@@ -498,24 +498,24 @@ class UnpaidScraper(BaseScraper):
 
             if not login_success:
                 safe_print("❌ 所有重新登入嘗試都失敗")
-                
+
                 # 最後嘗試：重新初始化瀏覽器會話
                 try:
                     safe_print("🔄 嘗試重新初始化瀏覽器會話...")
-                    
+
                     # 刪除所有 cookies
                     self.driver.delete_all_cookies()
-                    
+
                     # 回到首頁
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
                     time.sleep(3)
-                    
+
                     # 再次嘗試登入
                     final_login_success = self.login()
                     if final_login_success:
                         safe_print("✅ 重新初始化後登入成功")
                         return True
-                        
+
                 except Exception as reinit_e:
                     safe_print(f"❌ 重新初始化失敗: {reinit_e}")
 
@@ -604,10 +604,10 @@ class UnpaidScraper(BaseScraper):
 
                 # 設定該週期的日期範圍
                 period_result = self._download_period_data_with_details(period)
-                
+
                 # 記錄每期詳細情況
                 period_details.append(period_result)
-                
+
                 if period_result["files"]:
                     downloaded_files.extend(period_result["files"])
                     safe_print(f"✅ 第 {period} 期下載完成: {len(period_result['files'])} 個檔案")
@@ -631,17 +631,17 @@ class UnpaidScraper(BaseScraper):
         """為下一期重置頁面狀態 - 直接導航到交易明細表URL"""
         try:
             safe_print("🔄 導航到交易明細表頁面刷新...")
-            
+
             # 直接導航到交易明細表完整URL
             transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
             self.driver.get(transaction_url)
-            
+
             # 等待頁面載入
             time.sleep(5)
-            
+
             safe_print("✅ 成功導航到交易明細表頁面")
             return True
-            
+
         except Exception as e:
             safe_print(f"❌ 導航到交易明細表頁面失敗: {e}")
             # 如果直接導航失敗，回到原本的導航方法
@@ -711,7 +711,7 @@ class UnpaidScraper(BaseScraper):
                     period_info["status"] = "no_records"
                     period_info["record_count"] = 0
                     return period_info
-                
+
                 # 點擊下載按鈕
                 download_success = self._click_download_button()
                 if not download_success:
@@ -798,7 +798,7 @@ class UnpaidScraper(BaseScraper):
                 if not records_available:
                     safe_print(f"⚠️ 第 {period} 期無交易記錄，跳過下載")
                     return []
-                
+
                 # 點擊下載按鈕
                 download_success = self._click_download_button()
                 if not download_success:
@@ -1100,10 +1100,10 @@ class UnpaidScraper(BaseScraper):
         """檢查交易記錄筆數，避免下載空資料"""
         try:
             safe_print("🔍 檢查交易記錄筆數...")
-            
+
             # 查找包含筆數資訊的元素
             count_element = None
-            
+
             # 方法1: 直接尋找 lblTotleCount ID
             try:
                 count_element = self.driver.find_element(By.ID, "lblTotleCount")
@@ -1119,39 +1119,39 @@ class UnpaidScraper(BaseScraper):
                             break
                 except:
                     pass
-            
+
             if count_element:
                 try:
                     count_text = count_element.text.strip()
                     record_count = int(count_text)
                     safe_print(f"📊 交易記錄筆數: {record_count} 筆")
-                    
+
                     if record_count > 0:
                         safe_print("✅ 有交易記錄，可以執行下載")
                         return True
                     else:
                         safe_print("⚠️ 交易記錄筆數為 0，跳過下載避免空轉")
                         return False
-                        
+
                 except ValueError:
                     safe_print(f"⚠️ 無法解析筆數文字: {count_text}")
                     # 如果無法解析，謹慎起見還是允許下載
                     return True
             else:
                 safe_print("⚠️ 未找到筆數元素，檢查頁面內容...")
-                
+
                 # 備用方法：檢查頁面源碼
                 page_source = self.driver.page_source
-                
+
                 # 尋找 "交易共 X 筆" 的模式
                 import re
                 pattern = r'交易共.*?(\d+).*?筆'
                 match = re.search(pattern, page_source)
-                
+
                 if match:
                     record_count = int(match.group(1))
                     safe_print(f"📊 通過頁面內容檢測到交易記錄筆數: {record_count} 筆")
-                    
+
                     if record_count > 0:
                         safe_print("✅ 有交易記錄，可以執行下載")
                         return True
@@ -1161,7 +1161,7 @@ class UnpaidScraper(BaseScraper):
                 else:
                     safe_print("⚠️ 無法檢測筆數，為安全起見允許下載")
                     return True
-                    
+
         except Exception as e:
             safe_print(f"❌ 檢查記錄筆數時發生錯誤: {e}")
             # 發生錯誤時謹慎起見還是允許下載
