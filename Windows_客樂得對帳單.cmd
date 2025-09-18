@@ -1,5 +1,5 @@
 @echo off
-set "SCRIPT=%~dp0run_unpaid.ps1"
+set "SCRIPT=%~dp0PowerShell_客樂得對帳單.ps1"
 
 rem 優先用 Windows Terminal
 where wt >nul 2>&1

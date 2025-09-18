@@ -1,5 +1,5 @@
 @echo off
-set "SCRIPT=%~dp0run_payment.ps1"
+set "SCRIPT=%~dp0PowerShell_客戶交易明細.ps1"
 
 rem 優先用 Windows Terminal
 where wt >nul 2>&1
@@ -16,4 +16,4 @@ if %errorlevel%==0 (
 )
 
 rem 備援舊版 PowerShell
-start "" powershell -NoExit -ExecutionPolicy Bypass -File "%SCRIPT%" %*
+start "" powershell -NoExit -ExecutionPolicy Bypass -File "%SCRIPT%" %*

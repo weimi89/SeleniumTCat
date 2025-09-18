@@ -38,13 +38,13 @@ try {
         Write-Host "未提交的檔案:" -ForegroundColor Yellow
         git status --porcelain
         Write-Host ""
-        
+
         $response = Read-Host "是否要繼續更新? 這可能會覆蓋您的變更 [y/N]"
         if ($response -notmatch '^[Yy]$') {
             Write-Host "❌ 更新已取消" -ForegroundColor Red
             exit 1
         }
-        
+
         Write-Host "💾 儲存當前變更到暫存區..." -ForegroundColor Blue
         $stashMessage = "Auto-stash before update $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
         git stash push -m $stashMessage
@@ -104,19 +104,19 @@ try {
     # 執行更新
     Write-Host "⬇️  正在下載更新..." -ForegroundColor Blue
     $pullResult = git pull origin $currentBranch
-    
+
     if ($LASTEXITCODE -eq 0) {
         $newCommitShort = git rev-parse --short HEAD
         Write-Host ""
         Write-Host "✅ 更新成功!" -ForegroundColor Green
         Write-Host "📌 新版本: $newCommitShort" -ForegroundColor Cyan
-        
+
         # 檢查是否需要更新依賴
         $changedFiles = git diff --name-only $currentCommit HEAD
         if ($changedFiles -match "(pyproject\.toml|uv\.lock)") {
             Write-Host ""
             Write-Host "📦 偵測到依賴變更，正在更新套件..." -ForegroundColor Blue
-            
+
             if (Get-Command uv -ErrorAction SilentlyContinue) {
                 uv sync
                 Write-Host "✅ 依賴更新完成" -ForegroundColor Green
@@ -124,7 +124,7 @@ try {
                 Write-Host "⚠️  請手動執行: uv sync" -ForegroundColor Yellow
             }
         }
-        
+
         # 檢查是否有暫存的變更需要還原
         $stashList = git stash list
         if ($stashList -match "Auto-stash before update") {
@@ -138,11 +138,11 @@ try {
                 Write-Host "💡 使用 'git stash list' 查看暫存清單" -ForegroundColor Yellow
             }
         }
-        
+
         Write-Host ""
         Write-Host "🎉 WEDI 工具更新完成!" -ForegroundColor Green
         Write-Host "💡 如果遇到問題，請參考 README.md 或重新安裝依賴" -ForegroundColor Yellow
-        
+
     } else {
         Write-Host ""
         Write-Host "❌ 更新失敗" -ForegroundColor Red

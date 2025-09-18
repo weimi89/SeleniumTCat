@@ -835,7 +835,7 @@ class PaymentScraper(BaseScraper):
             if download_success:
                 # 生成目標檔案名
                 formatted_period = self.format_settlement_period_for_filename(self.current_settlement_period)
-                target_filename = f"{self.username}_{formatted_period}.xlsx"
+                target_filename = f"客樂得對帳單_{self.username}_{formatted_period}.xlsx"
                 target_file_path = self.download_dir / target_filename
 
                 # 如果目標檔案已存在，先刪除它

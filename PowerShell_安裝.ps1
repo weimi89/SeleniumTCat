@@ -15,7 +15,7 @@ Write-Host ""
 
 try {
     Write-Host "📦 步驟 1: 安裝 uv..." -ForegroundColor Yellow
-    
+
     # 檢查 uv 是否已安裝
     try {
         $uvVersion = & uv --version 2>$null
@@ -23,7 +23,7 @@ try {
     } catch {
         Write-Host "⬇️ 下載並安裝 uv..." -ForegroundColor Blue
         Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
-        
+
         # 重新檢查
         try {
             $uvVersion = & uv --version 2>$null
@@ -53,7 +53,7 @@ try {
             "C:\Program Files\Google\Chrome\Application\chrome.exe",
             "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
         )
-        
+
         $chromeFound = $false
         foreach ($path in $chromePaths) {
             if (Test-Path $path) {
@@ -63,7 +63,7 @@ try {
                 break
             }
         }
-        
+
         if (-not $chromeFound) {
             # 使用預設路徑
             "CHROME_BINARY_PATH=`"C:\Program Files\Google\Chrome\Application\chrome.exe`"" | Out-File -FilePath ".env" -Encoding UTF8
