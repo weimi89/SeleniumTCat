@@ -33,7 +33,7 @@ REM 優先順序：PowerShell 7 > 舊版 PowerShell
 where /q pwsh
 if %ERRORLEVEL% == 0 (
     echo 🚀 使用 PowerShell 7 進行更新...
-    pwsh -NoProfile -WorkingDirectory "%CD%" -File "scripts\update.ps1"
+    pwsh -NoProfile -WorkingDirectory "%CD%" -File "%CD%\scripts\update.ps1"
 ) else (
     echo 🚀 使用傳統 PowerShell 進行更新...
     powershell -NoProfile -Command "Set-Location '%CD%'; & '.\scripts\update.ps1'"

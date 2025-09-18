@@ -16,7 +16,7 @@ rem 優先用 Windows Terminal
 where wt >nul 2>&1
 if %errorlevel%==0 (
     echo 🚀 使用 Windows Terminal 啟動...
-    wt -w 0 -p "PowerShell" pwsh -NoExit -ExecutionPolicy Bypass -WorkingDirectory "%CD%" -File "scripts\invoice_details.ps1" %*
+    wt -w 0 -p "PowerShell" pwsh -NoExit -ExecutionPolicy Bypass -WorkingDirectory "%CD%" -File "%CD%\scripts\invoice_details.ps1" %*
     goto :end
 )
 
@@ -24,7 +24,7 @@ rem 如果沒裝 Windows Terminal，直接用 pwsh
 where pwsh >nul 2>&1
 if %errorlevel%==0 (
     echo 🚀 使用 PowerShell 7 啟動...
-    start "" pwsh -NoExit -ExecutionPolicy Bypass -WorkingDirectory "%CD%" -File "scripts\invoice_details.ps1" %*
+    start "" pwsh -NoExit -ExecutionPolicy Bypass -WorkingDirectory "%CD%" -File "%CD%\scripts\invoice_details.ps1" %*
     goto :end
 )
 
