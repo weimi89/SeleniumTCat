@@ -34,9 +34,9 @@ if [[ "$has_period" == false ]]; then
     echo "• 3 = 下載最新 3 期"
     echo "• 0 或空白 = 下載最新 1 期（預設）"
     echo ""
-    
+
     read -p "期數: " period_input
-    
+
     if [[ "$period_input" =~ ^[0-9]+$ && "$period_input" -gt 0 ]]; then
         final_args+=("--period" "$period_input")
         echo "✅ 將下載最新 $period_input 期"

@@ -47,33 +47,93 @@ class PaymentScraper(BaseScraper):
         self.periods_to_download = []
 
     def navigate_to_payment_query(self):
-        """導航到貨到付款查詢頁面 - 優先使用直接 URL"""
+        """導航到貨到付款查詢頁面 - 優先使用直接 URL，包含完整重試機制"""
         safe_print("🧭 導航到貨到付款查詢頁面...")
 
-        try:
-            # 等待登入完成
-            print("⏳ 等待登入完成...")
-            time.sleep(5)
+        max_attempts = 3  # 最多嘗試 3 次
+        
+        for attempt in range(max_attempts):
+            if attempt > 0:
+                safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
+                time.sleep(3)  # 間隔時間
 
-            # 直接使用已知的正確 URL
-            print("🎯 使用直接 URL 訪問貨到付款匯款明細表...")
-            direct_success = self._try_direct_urls()
+            try:
+                # 等待登入完成
+                print("⏳ 等待登入完成...")
+                time.sleep(5)
 
-            if direct_success:
-                return True
+                # 檢查當前會話狀態
+                if self._check_session_timeout():
+                    safe_print("⏰ 檢測到會話超時，嘗試重新登入...")
+                    if not self._handle_session_timeout():
+                        safe_print("❌ 重新登入失敗，跳過本次嘗試")
+                        continue
 
-            # 如果直接 URL 失敗，嘗試框架導航
-            safe_print("⚠️ 直接 URL 失敗，嘗試框架導航...")
-            frame_success = self._wait_for_frame_content()
-            if frame_success:
-                return self._navigate_in_frame()
+                # 直接使用已知的正確 URL
+                print("🎯 使用直接 URL 訪問貨到付款匯款明細表...")
+                direct_success = self._try_direct_urls()
 
-            safe_print("❌ 所有導航方法都失敗了")
-            return False
+                # 檢查是否遇到安全警告
+                if self.security_warning_encountered:
+                    safe_print("🚨 檢測到密碼安全警告，終止當前帳號處理")
+                    return False
 
-        except Exception as e:
-            safe_print(f"❌ 導航失敗: {e}")
-            return False
+                if direct_success:
+                    safe_print("✅ 直接 URL 導航成功")
+                    return True
+
+                # 如果直接 URL 失敗，再次檢查是否為會話超時
+                if self._check_session_timeout():
+                    safe_print("⏰ 直接 URL 失敗後檢測到會話超時")
+                    if self._handle_session_timeout():
+                        safe_print("✅ 重新登入成功，重試直接 URL...")
+                        # 重新嘗試直接 URL
+                        direct_success = self._try_direct_urls()
+
+                        # 檢查是否遇到安全警告
+                        if self.security_warning_encountered:
+                            safe_print("🚨 檢測到密碼安全警告，終止當前帳號處理")
+                            return False
+
+                        if direct_success:
+                            safe_print("✅ 重新登入後直接 URL 導航成功")
+                            return True
+
+                # 如果直接 URL 失敗，嘗試框架導航
+                safe_print("⚠️ 直接 URL 失敗，嘗試框架導航...")
+                frame_success = self._wait_for_frame_content()
+                if frame_success:
+                    navigation_success = self._navigate_in_frame()
+                    if navigation_success:
+                        safe_print("✅ 框架導航成功")
+                        return True
+                    else:
+                        safe_print("❌ 框架導航失敗")
+
+                # 如果所有方法都失敗，嘗試回到主頁重新開始
+                if attempt < max_attempts - 1:  # 不是最後一次嘗試
+                    safe_print("🏠 所有導航方法失敗，回到主頁重新開始...")
+                    try:
+                        # 回到合約客戶專區首頁
+                        home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+                        self.driver.get(home_url)
+                        time.sleep(3)
+                        
+                        # 檢查是否需要重新登入
+                        if 'Login.aspx' in self.driver.current_url:
+                            safe_print("🔑 需要重新登入...")
+                            self.login()
+                            time.sleep(3)
+                    except Exception as reset_e:
+                        safe_print(f"❌ 重置會話失敗: {reset_e}")
+
+            except Exception as e:
+                safe_print(f"❌ 第 {attempt + 1} 次導航嘗試失敗: {e}")
+                if attempt < max_attempts - 1:
+                    continue
+
+        safe_print("❌ 所有導航嘗試都失敗了")
+        return False
 
     def _wait_for_frame_content(self):
         """等待框架內容載入並尋找導航元素"""
@@ -362,57 +422,274 @@ class PaymentScraper(BaseScraper):
             return False
 
     def _try_direct_urls(self):
-        """嘗試直接 URL 訪問 - 使用 RedirectFunc 和已知的 URL"""
+        """嘗試直接 URL 訪問 - 使用 RedirectFunc 和已知的 URL，包含重試機制"""
         print("🔄 嘗試直接 URL 訪問...")
 
-        # 使用 RedirectFunc 方式和直接 URL
+        # 使用 RedirectFunc 方式和直接 URL，按優先級排序
         direct_urls = [
-            # 使用 RedirectFunc 的正確方式
+            # 使用 RedirectFunc 的正確方式（最高優先級）
             'https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=165',
             # 其他可能的直接 URL
             'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=02&TimeOut=N',
             'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx',
+            # 添加更多後備 URL
+            'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=01',
+            'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=03',
         ]
 
-        for url in direct_urls:
-            try:
-                print(f"   嘗試 URL: {url}")
-                self.driver.get(url)
-                time.sleep(5)  # 增加等待時間
+        max_retries = 2  # 每個 URL 最多重試 2 次
 
-                current_url = self.driver.current_url
-                page_source = self.driver.page_source
+        for url_index, url in enumerate(direct_urls):
+            print(f"   嘗試 URL {url_index + 1}/{len(direct_urls)}: {url}")
+            
+            for retry in range(max_retries + 1):
+                if retry > 0:
+                    print(f"      重試 {retry}/{max_retries}...")
+                
+                try:
+                    self.driver.get(url)
+                    time.sleep(2)  # 短暫等待以檢測 alert
+                    
+                    # 處理可能的 alert 彈窗
+                    alert_result = self._handle_alerts()
+                    if alert_result == "SECURITY_WARNING":
+                        print("   🚨 檢測到密碼安全警告，終止當前帳號處理")
+                        return False  # 終止當前帳號處理
+                    elif alert_result:
+                        print("   🔔 處理了安全提示或其他彈窗")
+                    
+                    time.sleep(3)  # 等待頁面完全載入
+                    
+                    current_url = self.driver.current_url
+                    page_source = self.driver.page_source
 
-                print(f"   導航後 URL: {current_url}")
+                    print(f"   導航後 URL: {current_url}")
 
-                # 檢查是否成功（不是錯誤頁面）
-                if ('ErrorMsg.aspx' not in current_url and
-                    'Login.aspx' not in current_url and
-                    'MsgCenter.aspx' not in current_url and  # 加入權限錯誤檢查
-                    current_url != self.url):
+                    # 檢查是否為會話超時
+                    if self._check_session_timeout():
+                        print("   ⏰ 檢測到會話超時，嘗試重新登入...")
+                        if self._handle_session_timeout():
+                            print("   ✅ 重新登入成功，重試導航...")
+                            # 重新嘗試當前 URL
+                            self.driver.get(url)
+                            time.sleep(3)
+                            current_url = self.driver.current_url
+                            page_source = self.driver.page_source
+                        else:
+                            print("   ❌ 重新登入失敗")
+                            continue
 
-                    # 檢查頁面內容是否包含相關關鍵字
-                    success_keywords = ['匯款明細', '貨到付款', '結算', '代收貨款', 'COD', '明細表']
-                    found_keywords = [kw for kw in success_keywords if kw in page_source]
+                    # 檢查是否成功（不是錯誤頁面）
+                    if (not any(error_page in current_url for error_page in 
+                               ['ErrorMsg.aspx', 'Login.aspx', 'MsgCenter.aspx']) and 
+                        current_url != self.url):
 
-                    if found_keywords:
-                        safe_print(f"✅ 成功導航到: {current_url}")
-                        print(f"   找到關鍵字: {', '.join(found_keywords)}")
-                        return True
+                        # 檢查頁面內容是否包含相關關鍵字
+                        success_keywords = ['匯款明細', '貨到付款', '結算', '代收貨款', 'COD', '明細表']
+                        found_keywords = [kw for kw in success_keywords if kw in page_source]
+
+                        if found_keywords:
+                            print(f"✅ 成功導航到: {current_url}")
+                            print(f"   找到關鍵字: {', '.join(found_keywords)}")
+                            return True
+                        else:
+                            print(f"   頁面載入但未找到預期內容")
+
+                    elif 'MsgCenter.aspx' in current_url:
+                        print("   ❌ 導向到訊息頁面，可能是權限問題")
                     else:
-                        print(f"   頁面載入但未找到預期內容")
+                        print(f"   導航失敗或重導向到錯誤頁面")
 
-                elif 'MsgCenter.aspx' in current_url:
-                    print(f"   ❌ 權限不足 - 無法存取此功能")
+                    # 如果這次嘗試失敗，但還有重試機會，則稍等片刻再重試
+                    if retry < max_retries:
+                        time.sleep(2)
+                    else:
+                        break  # 跳出重試循環，嘗試下一個 URL
 
-                else:
-                    print(f"   導航失敗或重導向到錯誤頁面")
+                except Exception as url_e:
+                    print(f"   ❌ URL 導航失敗 (嘗試 {retry + 1}): {url_e}")
 
-            except Exception as url_e:
-                print(f"   ❌ URL 導航失敗: {url_e}")
-                continue
+                    # 檢查是否為 alert 相關的異常
+                    if "alert" in str(url_e).lower() or "unexpected alert" in str(url_e).lower():
+                        # 嘗試處理 alert
+                        alert_result = self._handle_alerts()
+                        if alert_result == "SECURITY_WARNING":
+                            print("   🚨 檢測到密碼安全警告，終止當前帳號處理")
+                            return False  # 終止當前帳號處理
 
+                    if retry < max_retries:
+                        time.sleep(2)
+                    continue
+
+        print("   ❌ 所有直接 URL 嘗試都失敗")
         return False
+
+    def _check_session_timeout(self):
+        """檢查當前頁面是否為會話超時"""
+        try:
+            current_url = self.driver.current_url
+            page_source = self.driver.page_source
+
+            # 檢查 URL 是否包含會話超時相關的訊息
+            timeout_indicators = [
+                'MsgCenter.aspx',
+                '系統閒置過久',
+                '請重新登入',
+                'TimeOut',
+                'Session'
+            ]
+
+            # 檢查 URL
+            if any(indicator in current_url for indicator in timeout_indicators):
+                return True
+
+            # 檢查頁面內容
+            timeout_messages = [
+                '系統閒置過久',
+                '請重新登入',
+                'Session timeout',
+                'Session expired',
+                '會話超時'
+            ]
+
+            if any(message in page_source for message in timeout_messages):
+                return True
+
+            return False
+
+        except Exception as e:
+            safe_print(f"❌ 檢查會話狀態時發生錯誤: {e}")
+            return False
+
+    def _handle_session_timeout(self):
+        """處理會話超時，嘗試重新登入，包含完整的錯誤恢復機制"""
+        try:
+            safe_print("🔄 處理會話超時，嘗試重新登入...")
+
+            # 清除可能的彈窗或alert
+            try:
+                alert = self.driver.switch_to.alert
+                alert.accept()
+                print("   清除了一個 alert 彈窗")
+            except:
+                pass
+
+            # 確保回到主框架
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+
+            # 嘗試多個登入 URL，以防某些 URL 無法存取
+            login_urls = [
+                "https://www.takkyubin.com.tw/YMTContract/Login.aspx",
+                "https://www.takkyubin.com.tw/YMTContract/",
+                "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+            ]
+
+            login_success = False
+            
+            for login_url in login_urls:
+                try:
+                    print(f"   嘗試登入 URL: {login_url}")
+                    self.driver.get(login_url)
+                    time.sleep(3)
+
+                    current_url = self.driver.current_url
+                    print(f"   導航後 URL: {current_url}")
+
+                    # 檢查是否成功到達登入頁面
+                    if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
+                        print("   ✅ 成功到達登入頁面")
+                        
+                        # 重新執行登入流程
+                        login_success = self.login()
+                        if login_success:
+                            safe_print("✅ 會話超時後重新登入成功")
+                            
+                            # 等待登入完成並驗證
+                            time.sleep(5)
+                            
+                            # 驗證登入是否真的成功
+                            if not self._check_session_timeout():
+                                print("   ✅ 登入驗證成功，會話有效")
+                                return True
+                            else:
+                                print("   ❌ 登入驗證失敗，會話仍然無效")
+                                continue
+                        else:
+                            print("   ❌ 登入過程失敗")
+                            continue
+                    else:
+                        print("   ❌ 未能到達登入頁面")
+                        continue
+
+                except Exception as url_e:
+                    print(f"   ❌ 嘗試登入 URL 失敗: {url_e}")
+                    continue
+
+            if not login_success:
+                safe_print("❌ 所有重新登入嘗試都失敗")
+                
+                # 最後嘗試：重新初始化瀏覽器會話
+                try:
+                    safe_print("🔄 嘗試重新初始化瀏覽器會話...")
+                    
+                    # 刪除所有 cookies
+                    self.driver.delete_all_cookies()
+                    
+                    # 回到首頁
+                    self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
+                    time.sleep(3)
+                    
+                    # 再次嘗試登入
+                    final_login_success = self.login()
+                    if final_login_success:
+                        safe_print("✅ 重新初始化後登入成功")
+                        return True
+                        
+                except Exception as reinit_e:
+                    safe_print(f"❌ 重新初始化失敗: {reinit_e}")
+
+            return False
+
+        except Exception as e:
+            safe_print(f"❌ 處理會話超時時發生錯誤: {e}")
+            return False
+
+    def _handle_alerts(self):
+        """處理各種類型的 alert 彈窗 - 密碼安全提示會終止當前帳號"""
+        try:
+            alert = self.driver.switch_to.alert
+            alert_text = alert.text
+            safe_print(f"🔔 檢測到彈窗: {alert_text}")
+
+            # 檢查是否為密碼安全相關的嚴重警告
+            critical_keywords = ["密碼", "安全", "更新您的密碼", "為維護資訊安全"]
+
+            if any(keyword in alert_text for keyword in critical_keywords):
+                safe_print("🚨 檢測到密碼安全警告 - 終止當前帳號處理！")
+                safe_print("⛔ 請先更新此帳號密碼後再使用本工具")
+                alert.accept()  # 先關閉彈窗
+                # 設置安全警告標記
+                self.security_warning_encountered = True
+                # 返回特殊值表示需要終止當前帳號
+                return "SECURITY_WARNING"
+
+            # 對於其他非關鍵性提示，可以繼續
+            elif "系統" in alert_text:
+                safe_print("ℹ️ 系統提示 - 點擊確定繼續")
+                alert.accept()
+                return True
+            else:
+                # 對於其他類型的 alert，謹慎處理
+                safe_print(f"⚠️ 其他提示: {alert_text} - 點擊確定繼續")
+                alert.accept()
+                return True
+
+        except Exception:
+            # 沒有 alert 或其他處理失敗
+            return False
 
     def get_settlement_periods_for_download(self):
         """根據期數下載最新N期的結算區間 - 專門處理 ddlDate 選單"""
@@ -467,11 +744,44 @@ class PaymentScraper(BaseScraper):
                         option_texts = [opt.text.strip() for opt in options if opt.text.strip()]
                         date_keywords = ['202', '2025', '2024', '結算', '期間', '月']
 
-                        if any(keyword in ' '.join(option_texts) for keyword in date_keywords):
-                            # 獲取所有有效的結算區間選項
-                            valid_options = [opt for opt in options if opt.text.strip()]
+                        # 首先檢查是否只有一個選項且為無資料狀態
+                        if len(options) == 1:
+                            single_option = options[0]
+                            option_value = single_option.get_attribute('value')
+                            option_text = single_option.text.strip()
+                            
+                            # 如果只有一個選項且 value="~" 或包含無資料關鍵字
+                            if (option_value == "~" or 
+                                any(keyword in option_text for keyword in ['無日期區間可供查詢', '無資料', '沒有資料', '無可用資料', '無日期區間'])):
+                                safe_print(f"   ℹ️ 該帳號只有一個選項且為無資料狀態: '{option_text}' (value: {option_value})")
+                                safe_print("   ⏭️ 跳過此帳號，沒有可下載的資料")
+                                self.current_settlement_period = None
+                                return "NO_DATA_AVAILABLE"
+                        
+                        # 檢查是否只有「無日期區間可供查詢」或類似的無資料選項
+                        no_data_keywords = ['無日期區間可供查詢', '無資料', '沒有資料', '無可用資料', '無日期區間']
 
-                            if valid_options:
+                        # 獲取所有有效的結算區間選項（排除無資料選項和空選項）
+                        valid_options = []
+                        for opt in options:
+                            text = opt.text.strip()
+                            option_value = opt.get_attribute('value')
+                            
+                            # 排除 value="~" 的選項和包含無資料關鍵字的選項
+                            if (text and option_value != "~" and 
+                                not any(keyword in text for keyword in no_data_keywords)):
+                                # 檢查是否包含有效的日期資訊
+                                if any(keyword in text for keyword in date_keywords):
+                                    valid_options.append(opt)
+
+                        # 如果沒有任何有效選項，表示沒有資料可查詢
+                        if not valid_options:
+                            safe_print("   ℹ️ 所有選項都是無資料狀態，該帳號沒有可下載的資料")
+                            safe_print("   ⏭️ 跳過此帳號")
+                            self.current_settlement_period = None
+                            return "NO_DATA_AVAILABLE"
+
+                        if valid_options:
                                 # 確定實際要下載的期數
                                 actual_periods = min(self.period_number, len(valid_options))
                                 safe_print(f"   📋 找到 {len(valid_options)} 期可用，將下載最新 {actual_periods} 期")
@@ -500,22 +810,25 @@ class PaymentScraper(BaseScraper):
                                     if first_valid_index is not None:
                                         select_obj.select_by_index(first_valid_index)
                                         time.sleep(2)
-                                        self.current_settlement_period = valid_options[0].text.strip()
-                                        safe_print(f"   ✅ 已選擇第 1 期作為起始: {self.current_settlement_period}")
+                                        # 獲取選中的選項文字
+                                        selected_option = options[first_valid_index]
+                                        self.current_settlement_period = selected_option.text.strip()
+                                        safe_print(f"   ✅ 已選擇第 {first_valid_index + 1} 期作為起始: {self.current_settlement_period}")
                                         break
+                                    else:
+                                        safe_print("   ⚠️ 找到有效選項但無法選擇")
                                 except Exception as select_e:
                                     safe_print(f"   ❌ 選擇第 1 期失敗: {select_e}")
-                            else:
-                                safe_print("   ⚠️ 沒有找到有效的結算期間選項")
-                        else:
-                            print("   ⚠️ 選項不包含日期相關內容，跳過此選單")
 
                 except Exception as e:
                     print(f"   處理選單 {i} 失敗: {e}")
                     continue
 
             if not selected_period:
-                safe_print("⚠️ 未能自動選擇結算期間，使用預設值繼續")
+                safe_print("⚠️ 未能找到任何有效的結算期間選項")
+                safe_print("⏭️ 該帳號沒有可下載的資料，跳過")
+                self.current_settlement_period = None
+                return "NO_DATA_AVAILABLE"
 
             return selected_period
 
@@ -526,32 +839,58 @@ class PaymentScraper(BaseScraper):
     def format_settlement_period_for_filename(self, period_text):
         """將結算期間轉換為檔案名格式"""
         if not period_text:
-            return "unknown_period"
+            safe_print(f"⚠️ 結算期間為空，使用預設檔名")
+            from datetime import datetime
+            # 使用當前日期作為備用檔案名
+            current_date = datetime.now().strftime("%Y%m%d")
+            return f"unknown_period_{current_date}"
+
+        safe_print(f"🔄 格式化結算期間: '{period_text}'")
 
         try:
             # 例如: "2025/09/04~2025/09/07" -> "20250904-20250907"
             # 使用正則表達式提取日期
             import re
-            date_pattern = r'(\d{4})/(\d{2})/(\d{2})~(\d{4})/(\d{2})/(\d{2})'
-            match = re.search(date_pattern, period_text)
 
-            if match:
-                start_year, start_month, start_day = match.group(1), match.group(2), match.group(3)
-                end_year, end_month, end_day = match.group(4), match.group(5), match.group(6)
+            # 支援多種日期格式
+            patterns = [
+                r'(\d{4})/(\d{1,2})/(\d{1,2})~(\d{4})/(\d{1,2})/(\d{1,2})',  # 2025/9/4~2025/9/7
+                r'(\d{4})-(\d{1,2})-(\d{1,2})~(\d{4})-(\d{1,2})-(\d{1,2})',  # 2025-9-4~2025-9-7
+                r'(\d{4})年(\d{1,2})月(\d{1,2})日~(\d{4})年(\d{1,2})月(\d{1,2})日',  # 中文格式
+                r'(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})',  # 20250904-20250907
+            ]
 
-                # 格式化為: YYYYMMDD-YYYYMMDD
-                start_date = f"{start_year}{start_month}{start_day}"
-                end_date = f"{end_year}{end_month}{end_day}"
+            for pattern in patterns:
+                match = re.search(pattern, period_text)
+                if match:
+                    start_year, start_month, start_day = match.group(1), match.group(2), match.group(3)
+                    end_year, end_month, end_day = match.group(4), match.group(5), match.group(6)
 
-                return f"{start_date}-{end_date}"
-            else:
-                # 如果無法解析，嘗試其他格式或返回原始文字（去除特殊字符）
-                safe_text = re.sub(r'[^\w\-]', '_', period_text)
-                return safe_text
+                    # 確保月份和日期是兩位數
+                    start_month = start_month.zfill(2)
+                    start_day = start_day.zfill(2)
+                    end_month = end_month.zfill(2)
+                    end_day = end_day.zfill(2)
+
+                    # 格式化為: YYYYMMDD-YYYYMMDD
+                    start_date = f"{start_year}{start_month}{start_day}"
+                    end_date = f"{end_year}{end_month}{end_day}"
+
+                    formatted_name = f"{start_date}-{end_date}"
+                    safe_print(f"✅ 結算期間格式化成功: {formatted_name}")
+                    return formatted_name
+
+            # 如果沒有匹配到日期格式，嘗試其他可能的格式
+            safe_print(f"⚠️ 無法解析日期格式，使用安全文字: '{period_text}'")
+            # 移除不安全的字符，保留中文、英文、數字、連字號和底線
+            safe_text = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', period_text)
+            return safe_text
+
         except Exception as e:
-            safe_print(f"⚠️ 格式化結算期間失敗: {e}")
+            safe_print(f"❌ 格式化結算期間失敗: {e}")
             # 返回安全的檔案名
-            safe_text = re.sub(r'[^\w\-]', '_', period_text)
+            import re
+            safe_text = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', str(period_text))
             return safe_text
 
     def download_cod_statement(self):
@@ -899,20 +1238,44 @@ class PaymentScraper(BaseScraper):
             # 3. 導航到貨到付款查詢頁面
             nav_success = self.navigate_to_payment_query()
             if not nav_success:
-                safe_print(f"❌ 帳號 {self.username} 導航失敗")
-                return {
-                    "success": False,
-                    "username": self.username,
-                    "error": "導航失敗",
-                    "downloads": []
-                }
+                # 檢查是否為密碼安全警告
+                if self.security_warning_encountered:
+                    safe_print(f"🚨 帳號 {self.username} 密碼安全警告")
+                    return {
+                        "success": False,
+                        "username": self.username,
+                        "error": "密碼安全警告",
+                        "error_type": "security_warning",
+                        "downloads": []
+                    }
+                else:
+                    safe_print(f"❌ 帳號 {self.username} 導航失敗")
+                    return {
+                        "success": False,
+                        "username": self.username,
+                        "error": "導航失敗",
+                        "downloads": []
+                    }
 
             # 4. 獲取要下載的多期結算期間資訊
             periods_success = self.get_settlement_periods_for_download()
-            if not periods_success:
-                safe_print(f"⚠️ 帳號 {self.username} 未能獲取結算期間資訊，但嘗試繼續執行")
-                # 如果獲取期間失敗，嘗試下載預設的一期
-                downloaded_files = self.download_cod_statement()
+            if periods_success == "NO_DATA_AVAILABLE":
+                safe_print(f"ℹ️ 帳號 {self.username} 沒有可供查詢的日期區間，跳過下載")
+                return {
+                    "success": True,
+                    "username": self.username,
+                    "message": "沒有可供查詢的日期區間",
+                    "downloads": []
+                }
+            elif not periods_success:
+                safe_print(f"⚠️ 帳號 {self.username} 未能獲取結算期間資訊")
+                safe_print("⏭️ 無法確定資料可用性，跳過此帳號")
+                return {
+                    "success": True,
+                    "username": self.username,
+                    "message": "未能獲取結算期間資訊",
+                    "downloads": []
+                }
             else:
                 # 5. 逐一下載每期的貨到付款匯款明細表
                 safe_print(f"🎯 開始下載 {len(self.periods_to_download)} 期資料...")
