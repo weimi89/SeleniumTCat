@@ -29,7 +29,7 @@ if ! git diff-index --quiet HEAD --; then
         echo "❌ 更新已取消"
         exit 1
     fi
-    
+
     echo "💾 儲存當前變更到暫存區..."
     git stash push -m "Auto-stash before update $(date '+%Y-%m-%d %H:%M:%S')"
     echo "✅ 變更已暫存"
@@ -91,7 +91,7 @@ if git pull origin $current_branch; then
     echo ""
     echo "✅ 更新成功!"
     echo "📌 新版本: $new_commit_short"
-    
+
     # 檢查是否需要更新依賴
     if git diff --name-only $current_commit HEAD | grep -q "pyproject.toml\|uv.lock"; then
         echo ""
@@ -103,7 +103,7 @@ if git pull origin $current_branch; then
             echo "⚠️  請手動執行: uv sync"
         fi
     fi
-    
+
     # 檢查是否有暫存的變更需要還原
     if git stash list | grep -q "Auto-stash before update"; then
         echo ""
@@ -115,11 +115,11 @@ if git pull origin $current_branch; then
             echo "💡 使用 'git stash list' 查看暫存清單"
         fi
     fi
-    
+
     echo ""
     echo "🎉 WEDI 工具更新完成!"
     echo "💡 如果遇到問題，請參考 README.md 或重新安裝依賴"
-    
+
 else
     echo ""
     echo "❌ 更新失敗"

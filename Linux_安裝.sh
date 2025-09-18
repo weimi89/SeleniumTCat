@@ -155,7 +155,7 @@ setup_project() {
     if [ -f "run_payment.sh" ]; then
         chmod +x run_payment.sh
     fi
-    
+
     # 建立帳號設定範例
     if [ ! -f "accounts.json" ]; then
         if [ -f "accounts.json.example" ]; then

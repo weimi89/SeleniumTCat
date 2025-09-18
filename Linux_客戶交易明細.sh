@@ -35,9 +35,9 @@ if [[ "$has_periods" == false ]]; then
     echo "• 3 = 下載最新 3 週期"
     echo "• 0 或空白 = 下載最新 2 週期（預設）"
     echo ""
-    
+
     read -p "週期數: " periods_input
-    
+
     if [[ "$periods_input" =~ ^[0-9]+$ && "$periods_input" -gt 0 ]]; then
         final_args+=("--periods" "$periods_input")
         echo "✅ 將下載最新 $periods_input 個週期"

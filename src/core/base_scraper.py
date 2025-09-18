@@ -35,6 +35,9 @@ class BaseScraper:
         self.driver = None
         self.wait = None
 
+        # 安全警告標記 - 用於跟蹤是否遇到密碼安全警告
+        self.security_warning_encountered = False
+
         # 初始化 ddddocr
         self.ocr = ddddocr.DdddOcr(show_ad=False)
 
@@ -245,15 +248,29 @@ class BaseScraper:
             # 檢查是否有錯誤訊息在頁面上
             self._check_error_messages()
 
-            # 檢查是否有Alert彈窗
+            # 檢查是否有Alert彈窗 - 使用統一的處理方式
             try:
-                alert = self.driver.switch_to.alert
-                alert_text = alert.text
-                safe_print(f"⚠️ 出現警告彈窗: {alert_text}")
-                alert.accept()  # 點擊確定
-                return False  # 登入失敗
-            except:
-                pass  # 沒有Alert彈窗
+                # 如果子類別有 _handle_alerts 方法，使用它
+                if hasattr(self, '_handle_alerts'):
+                    alert_result = self._handle_alerts()
+                    if alert_result == "SECURITY_WARNING":
+                        safe_print("🚨 登入後遇到密碼安全警告，終止當前帳號處理")
+                        return False  # 返回 False 表示登入失敗，讓上層處理
+                    elif alert_result:
+                        safe_print("🔔 登入後處理了彈窗")
+                else:
+                    # fallback 到舊的處理方式
+                    try:
+                        alert = self.driver.switch_to.alert
+                        alert_text = alert.text
+                        safe_print(f"⚠️ 出現警告彈窗: {alert_text}")
+                        alert.accept()  # 點擊確定
+                        return False  # 登入失敗
+                    except:
+                        pass  # 沒有Alert彈窗
+            except Exception as e:
+                safe_print(f"⚠️ 處理登入後彈窗時發生錯誤: {e}")
+                pass
 
             safe_print("✅ 表單已提交")
             return True

@@ -130,12 +130,16 @@ class MultiAccountManager:
 
         successful_accounts = [r for r in results if r["success"]]
         failed_accounts = [r for r in results if not r["success"]]
+        security_warning_accounts = [r for r in failed_accounts if r.get("error_type") == "security_warning"]
+        other_failed_accounts = [r for r in failed_accounts if r.get("error_type") != "security_warning"]
         total_downloads = sum(len(r["downloads"]) for r in results)
 
         safe_print(f"📊 執行統計:")
         print(f"   總帳號數: {len(results)}")
         print(f"   成功帳號: {len(successful_accounts)}")
-        print(f"   失敗帳號: {len(failed_accounts)}")
+        print(f"   失敗帳號: {len(other_failed_accounts)}")
+        if security_warning_accounts:
+            print(f"   密碼安全警告: {len(security_warning_accounts)}")
         print(f"   總下載檔案: {total_downloads}")
 
         if successful_accounts:
@@ -148,9 +152,15 @@ class MultiAccountManager:
                 else:
                     safe_print(f"   🔸 {username}: 成功下載 {download_count} 個檔案")
 
-        if failed_accounts:
+        if security_warning_accounts:
+            safe_print(f"\n🚨 密碼安全警告帳號詳情:")
+            for result in security_warning_accounts:
+                username = result["username"]
+                safe_print(f"   🔸 {username}: 需要更新密碼才能繼續使用")
+
+        if other_failed_accounts:
             safe_print(f"\n❌ 失敗帳號詳情:")
-            for result in failed_accounts:
+            for result in other_failed_accounts:
                 username = result["username"]
                 error = result.get("error", "未知錯誤")
                 safe_print(f"   🔸 {username}: {error}")
@@ -174,6 +184,8 @@ class MultiAccountManager:
             }
             if "error" in result:
                 clean_result["error"] = result["error"]
+            if "error_type" in result:
+                clean_result["error_type"] = result["error_type"]
             if "message" in result:
                 clean_result["message"] = result["message"]
             clean_results.append(clean_result)
@@ -183,7 +195,8 @@ class MultiAccountManager:
                 "execution_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "total_accounts": len(results),
                 "successful_accounts": len(successful_accounts),
-                "failed_accounts": len(failed_accounts),
+                "failed_accounts": len(other_failed_accounts),
+                "security_warning_accounts": len(security_warning_accounts),
                 "total_downloads": total_downloads,
                 "details": clean_results
             }, f, ensure_ascii=False, indent=2)

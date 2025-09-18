@@ -62,34 +62,94 @@ class FreightScraper(BaseScraper):
         safe_print(f"📅 查詢日期範圍: {self.start_date} - {self.end_date}")
 
     def navigate_to_freight_query(self):
-        """導航到對帳單明細頁面"""
+        """導航到對帳單明細頁面 - 包含完整重試機制和 session timeout 處理"""
         safe_print("🧭 導航到對帳單明細頁面...")
 
-        try:
-            # 等待登入完成
-            safe_print("⏳ 等待登入完成...")
-            time.sleep(5)
+        max_attempts = 3  # 最多嘗試 3 次
+        
+        for attempt in range(max_attempts):
+            if attempt > 0:
+                safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
+                time.sleep(3)  # 間隔時間
 
-            # 方法1: 嘗試直接使用 URL
-            direct_success = self._try_direct_freight_url()
-            if direct_success:
-                return True
+            try:
+                # 等待登入完成
+                safe_print("⏳ 等待登入完成...")
+                time.sleep(5)
 
-            # 方法2: 嘗試框架導航
-            safe_print("⚠️ 直接 URL 失敗，嘗試框架導航...")
-            frame_success = self._navigate_through_menu()
-            if frame_success:
-                return True
+                # 檢查當前會話狀態
+                if self._check_session_timeout():
+                    safe_print("⏰ 檢測到會話超時，嘗試重新登入...")
+                    if not self._handle_session_timeout():
+                        safe_print("❌ 重新登入失敗，跳過本次嘗試")
+                        continue
 
-            safe_print("❌ 所有導航方法都失敗了")
-            return False
+                # 方法1: 嘗試直接使用 URL
+                safe_print("🎯 使用直接 URL 訪問對帳單明細頁面...")
+                direct_success = self._try_direct_freight_url()
 
-        except Exception as e:
-            safe_print(f"❌ 導航失敗: {e}")
-            return False
+                # 檢查是否遇到安全警告
+                if self.security_warning_encountered:
+                    safe_print("🚨 檢測到密碼安全警告，終止當前帳號處理")
+                    return False
+
+                if direct_success:
+                    safe_print("✅ 直接 URL 導航成功")
+                    return True
+
+                # 如果直接 URL 失敗，再次檢查是否為會話超時
+                if self._check_session_timeout():
+                    safe_print("⏰ 直接 URL 失敗後檢測到會話超時")
+                    if self._handle_session_timeout():
+                        safe_print("✅ 重新登入成功，重試直接 URL...")
+                        # 重新嘗試直接 URL
+                        direct_success = self._try_direct_freight_url()
+
+                        # 檢查是否遇到安全警告
+                        if self.security_warning_encountered:
+                            safe_print("🚨 檢測到密碼安全警告，終止當前帳號處理")
+                            return False
+
+                        if direct_success:
+                            safe_print("✅ 重新登入後直接 URL 導航成功")
+                            return True
+
+                # 方法2: 嘗試框架導航
+                safe_print("⚠️ 直接 URL 失敗，嘗試框架導航...")
+                frame_success = self._navigate_through_menu()
+                if frame_success:
+                    safe_print("✅ 框架導航成功")
+                    return True
+                else:
+                    safe_print("❌ 框架導航失敗")
+
+                # 如果所有方法都失敗，嘗試回到主頁重新開始
+                if attempt < max_attempts - 1:  # 不是最後一次嘗試
+                    safe_print("🏠 所有導航方法失敗，回到主頁重新開始...")
+                    try:
+                        # 回到合約客戶專區首頁
+                        home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+                        self.driver.get(home_url)
+                        time.sleep(3)
+                        
+                        # 檢查是否需要重新登入
+                        if 'Login.aspx' in self.driver.current_url:
+                            safe_print("🔑 需要重新登入...")
+                            self.login()
+                            time.sleep(3)
+                    except Exception as reset_e:
+                        safe_print(f"❌ 重置會話失敗: {reset_e}")
+
+            except Exception as e:
+                safe_print(f"❌ 第 {attempt + 1} 次導航嘗試失敗: {e}")
+                if attempt < max_attempts - 1:
+                    continue
+
+        safe_print("❌ 所有導航嘗試都失敗了")
+        return False
 
     def _try_direct_freight_url(self):
-        """嘗試直接訪問對帳單明細頁面"""
+        """嘗試直接訪問對帳單明細頁面 - 包含重試機制和 session timeout 處理"""
         try:
             # 基於用戶提供的正確 URL 格式，參考 PaymentScraper 的成功模式
             direct_urls = [
@@ -98,24 +158,79 @@ class FreightScraper(BaseScraper):
                 # 其他可能的直接 URL
                 'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=01&TimeOut=N',
                 'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx',
+                # 添加更多後備 URL
+                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=02',
+                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=03',
             ]
 
-            for full_url in direct_urls:
-                try:
-                    safe_print(f"🎯 嘗試直接訪問: {full_url}")
+            max_retries = 2  # 每個 URL 最多重試 2 次
 
-                    self.driver.get(full_url)
-                    time.sleep(5)  # 增加等待時間以確保頁面完全載入
+            for url_index, full_url in enumerate(direct_urls):
+                safe_print(f"🎯 嘗試 URL {url_index + 1}/{len(direct_urls)}: {full_url}")
+                
+                for retry in range(max_retries + 1):
+                    if retry > 0:
+                        print(f"      重試 {retry}/{max_retries}...")
+                    
+                    try:
+                        self.driver.get(full_url)
+                        time.sleep(2)  # 短暫等待以檢測 alert
 
-                    # 檢查是否成功到達對帳單明細頁面
-                    if self._is_freight_page():
-                        safe_print("✅ 直接 URL 訪問成功")
-                        return True
+                        # 處理可能的 alert 彈窗
+                        alert_result = self._handle_alerts()
+                        if alert_result == "SECURITY_WARNING":
+                            print("   🚨 檢測到密碼安全警告，終止當前帳號處理")
+                            return False  # 終止當前帳號處理
+                        elif alert_result:
+                            print("   🔔 處理了安全提示或其他彈窗")
 
-                except Exception as e:
-                    safe_print(f"⚠️ 直接 URL {full_url} 失敗: {e}")
-                    continue
+                        time.sleep(3)  # 等待頁面完全載入
+                        
+                        current_url = self.driver.current_url
+                        print(f"   導航後 URL: {current_url}")
 
+                        # 檢查是否為會話超時
+                        if self._check_session_timeout():
+                            print("   ⏰ 檢測到會話超時，嘗試重新登入...")
+                            if self._handle_session_timeout():
+                                print("   ✅ 重新登入成功，重試導航...")
+                                # 重新嘗試當前 URL
+                                self.driver.get(full_url)
+                                time.sleep(3)
+                                current_url = self.driver.current_url
+                            else:
+                                print("   ❌ 重新登入失敗")
+                                continue
+
+                        # 檢查是否成功到達對帳單明細頁面
+                        if self._is_freight_page():
+                            safe_print("✅ 直接 URL 訪問成功")
+                            return True
+                        else:
+                            print("   ❌ 未能到達對帳單明細頁面")
+
+                        # 如果這次嘗試失敗，但還有重試機會，則稍等片刻再重試
+                        if retry < max_retries:
+                            time.sleep(2)
+                        else:
+                            break  # 跳出重試循環，嘗試下一個 URL
+
+                    except Exception as e:
+                        print(f"   ❌ URL 導航失敗 (嘗試 {retry + 1}): {e}")
+
+                        # 檢查是否為 alert 相關的異常
+                        if "alert" in str(e).lower() or "unexpected alert" in str(e).lower():
+                            # 嘗試處理 alert
+                            alert_result = self._handle_alerts()
+                            if alert_result == "SECURITY_WARNING":
+                                print("   🚨 檢測到密碼安全警告，終止當前帳號處理")
+                                return False  # 終止當前帳號處理
+
+                        if retry < max_retries:
+                            time.sleep(2)
+                        continue
+
+            print("   ❌ 所有直接 URL 嘗試都失敗")
             return False
 
         except Exception as e:
@@ -291,6 +406,173 @@ class FreightScraper(BaseScraper):
 
         except Exception as e:
             safe_print(f"❌ 頁面檢查失敗: {e}")
+            return False
+
+    def _check_session_timeout(self):
+        """檢查當前頁面是否為會話超時"""
+        try:
+            current_url = self.driver.current_url
+            page_source = self.driver.page_source
+
+            # 檢查 URL 是否包含會話超時相關的訊息
+            timeout_indicators = [
+                'MsgCenter.aspx',
+                '系統閒置過久',
+                '請重新登入',
+                'TimeOut',
+                'Session'
+            ]
+
+            # 檢查 URL
+            if any(indicator in current_url for indicator in timeout_indicators):
+                return True
+
+            # 檢查頁面內容
+            timeout_messages = [
+                '系統閒置過久',
+                '請重新登入',
+                'Session timeout',
+                'Session expired',
+                '會話超時'
+            ]
+
+            if any(message in page_source for message in timeout_messages):
+                return True
+
+            return False
+
+        except Exception as e:
+            safe_print(f"❌ 檢查會話狀態時發生錯誤: {e}")
+            return False
+
+    def _handle_session_timeout(self):
+        """處理會話超時，嘗試重新登入，包含完整的錯誤恢復機制"""
+        try:
+            safe_print("🔄 處理會話超時，嘗試重新登入...")
+
+            # 清除可能的彈窗或alert
+            try:
+                alert = self.driver.switch_to.alert
+                alert.accept()
+                print("   清除了一個 alert 彈窗")
+            except:
+                pass
+
+            # 確保回到主框架
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+
+            # 嘗試多個登入 URL，以防某些 URL 無法存取
+            login_urls = [
+                "https://www.takkyubin.com.tw/YMTContract/Login.aspx",
+                "https://www.takkyubin.com.tw/YMTContract/",
+                "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+            ]
+
+            login_success = False
+            
+            for login_url in login_urls:
+                try:
+                    print(f"   嘗試登入 URL: {login_url}")
+                    self.driver.get(login_url)
+                    time.sleep(3)
+
+                    current_url = self.driver.current_url
+                    print(f"   導航後 URL: {current_url}")
+
+                    # 檢查是否成功到達登入頁面
+                    if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
+                        print("   ✅ 成功到達登入頁面")
+                        
+                        # 重新執行登入流程
+                        login_success = self.login()
+                        if login_success:
+                            safe_print("✅ 會話超時後重新登入成功")
+                            
+                            # 等待登入完成並驗證
+                            time.sleep(5)
+                            
+                            # 驗證登入是否真的成功
+                            if not self._check_session_timeout():
+                                print("   ✅ 登入驗證成功，會話有效")
+                                return True
+                            else:
+                                print("   ❌ 登入驗證失敗，會話仍然無效")
+                                continue
+                        else:
+                            print("   ❌ 登入過程失敗")
+                            continue
+                    else:
+                        print("   ❌ 未能到達登入頁面")
+                        continue
+
+                except Exception as url_e:
+                    print(f"   ❌ 嘗試登入 URL 失敗: {url_e}")
+                    continue
+
+            if not login_success:
+                safe_print("❌ 所有重新登入嘗試都失敗")
+                
+                # 最後嘗試：重新初始化瀏覽器會話
+                try:
+                    safe_print("🔄 嘗試重新初始化瀏覽器會話...")
+                    
+                    # 刪除所有 cookies
+                    self.driver.delete_all_cookies()
+                    
+                    # 回到首頁
+                    self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
+                    time.sleep(3)
+                    
+                    # 再次嘗試登入
+                    final_login_success = self.login()
+                    if final_login_success:
+                        safe_print("✅ 重新初始化後登入成功")
+                        return True
+                        
+                except Exception as reinit_e:
+                    safe_print(f"❌ 重新初始化失敗: {reinit_e}")
+
+            return False
+
+        except Exception as e:
+            safe_print(f"❌ 處理會話超時時發生錯誤: {e}")
+            return False
+
+    def _handle_alerts(self):
+        """處理各種類型的 alert 彈窗 - 密碼安全提示會終止當前帳號"""
+        try:
+            alert = self.driver.switch_to.alert
+            alert_text = alert.text
+            safe_print(f"🔔 檢測到彈窗: {alert_text}")
+
+            # 檢查是否為密碼安全相關的嚴重警告
+            critical_keywords = ["密碼", "安全", "更新您的密碼", "為維護資訊安全"]
+
+            if any(keyword in alert_text for keyword in critical_keywords):
+                safe_print("🚨 檢測到密碼安全警告 - 終止當前帳號處理！")
+                safe_print("⛔ 請先更新此帳號密碼後再使用本工具")
+                alert.accept()  # 先關閉彈窗
+                # 設置安全警告標記
+                self.security_warning_encountered = True
+                # 返回特殊值表示需要終止當前帳號
+                return "SECURITY_WARNING"
+
+            # 對於其他非關鍵性提示，可以繼續
+            elif "系統" in alert_text:
+                safe_print("ℹ️ 系統提示 - 點擊確定繼續")
+                alert.accept()
+                return True
+            else:
+                # 對於其他類型的 alert，謹慎處理
+                safe_print(f"⚠️ 其他提示: {alert_text} - 點擊確定繼續")
+                alert.accept()
+                return True
+
+        except Exception:
+            # 沒有 alert 或其他處理失敗
             return False
 
     def set_invoice_date_range(self):
@@ -733,13 +1015,24 @@ class FreightScraper(BaseScraper):
             # 3. 導航到對帳單明細頁面
             nav_success = self.navigate_to_freight_query()
             if not nav_success:
-                safe_print(f"❌ 帳號 {self.username} 導航失敗")
-                return {
-                    "success": False,
-                    "username": self.username,
-                    "error": "導航失敗",
-                    "downloads": []
-                }
+                # 檢查是否為密碼安全警告
+                if self.security_warning_encountered:
+                    safe_print(f"🚨 帳號 {self.username} 密碼安全警告")
+                    return {
+                        "success": False,
+                        "username": self.username,
+                        "error": "密碼安全警告",
+                        "error_type": "security_warning",
+                        "downloads": []
+                    }
+                else:
+                    safe_print(f"❌ 帳號 {self.username} 導航失敗")
+                    return {
+                        "success": False,
+                        "username": self.username,
+                        "error": "導航失敗",
+                        "downloads": []
+                    }
 
             # 4. 設定發票日期區間
             date_success = self.set_invoice_date_range()
