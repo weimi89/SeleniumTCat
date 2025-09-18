@@ -8,6 +8,7 @@
 
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 import ddddocr
@@ -37,6 +38,11 @@ class BaseScraper:
 
         # 安全警告標記 - 用於跟蹤是否遇到密碼安全警告
         self.security_warning_encountered = False
+
+        # 執行時間統計
+        self.start_time = None
+        self.end_time = None
+        self.execution_duration_minutes = 0
 
         # 初始化 ddddocr
         self.ocr = ddddocr.DdddOcr(show_ad=False)
@@ -371,3 +377,38 @@ class BaseScraper:
         if self.driver:
             self.driver.quit()
             safe_print("🔚 瀏覽器已關閉")
+
+    def start_execution_timer(self):
+        """開始執行時間計時"""
+        self.start_time = datetime.now()
+        safe_print(f"⏱️ 開始執行時間: {self.start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    def end_execution_timer(self):
+        """結束執行時間計時並計算總時長"""
+        self.end_time = datetime.now()
+        if self.start_time:
+            duration = self.end_time - self.start_time
+            self.execution_duration_minutes = duration.total_seconds() / 60
+            safe_print(f"⏱️ 結束執行時間: {self.end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            safe_print(f"📊 執行時長: {self.execution_duration_minutes:.2f} 分鐘")
+        else:
+            safe_print("⚠️ 未找到開始時間，無法計算執行時長")
+
+    def get_execution_summary(self):
+        """獲取執行時間摘要"""
+        if self.start_time and self.end_time:
+            return {
+                "username": self.username,
+                "start_time": self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
+                "end_time": self.end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                "duration_minutes": round(self.execution_duration_minutes, 2),
+                "security_warning": self.security_warning_encountered
+            }
+        else:
+            return {
+                "username": self.username,
+                "start_time": None,
+                "end_time": None,
+                "duration_minutes": 0,
+                "security_warning": self.security_warning_encountered
+            }

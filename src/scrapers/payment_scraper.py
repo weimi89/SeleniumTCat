@@ -1216,6 +1216,9 @@ class PaymentScraper(BaseScraper):
         success = False
         downloaded_files = []
 
+        # 開始執行時間計時
+        self.start_execution_timer()
+
         try:
             print("=" * 60)
             safe_print(f"🤖 開始執行黑貓宅急便自動下載流程 (帳號: {self.username})")
@@ -1344,6 +1347,8 @@ class PaymentScraper(BaseScraper):
                 "downloads": [str(f) for f in downloaded_files]  # 轉換 PosixPath 為字串
             }
         finally:
+            # 結束執行時間計時
+            self.end_execution_timer()
             self.close()
 
 

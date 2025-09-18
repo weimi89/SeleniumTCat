@@ -20,6 +20,11 @@ class MultiAccountManager:
     def __init__(self, config_file="accounts.json"):
         self.config_file = config_file
         self.load_config()
+        
+        # 執行時間統計
+        self.total_start_time = None
+        self.total_end_time = None
+        self.total_execution_minutes = 0
 
     def load_config(self):
         """載入設定檔"""
@@ -57,6 +62,10 @@ class MultiAccountManager:
             progress_callback: 進度回呼函數
             **scraper_kwargs: 額外的 scraper 參數 (例如 period_number, start_date, end_date)
         """
+        # 開始總執行時間計時
+        self.total_start_time = datetime.now()
+        safe_print(f"⏱️ 總執行開始時間: {self.total_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
         accounts = self.get_enabled_accounts()
         results = []
         settings = self.config.get("settings", {})
@@ -100,7 +109,13 @@ class MultiAccountManager:
                 scraper_init_kwargs.update(scraper_kwargs)
 
                 scraper = scraper_class(**scraper_init_kwargs)
+                
                 result = scraper.run_full_process()
+                
+                # 將時間統計添加到結果中
+                execution_summary = scraper.get_execution_summary()
+                result.update(execution_summary)
+                
                 results.append(result)
 
                 # 帳號間暫停一下避免過於頻繁
@@ -117,6 +132,14 @@ class MultiAccountManager:
                     "downloads": []
                 })
                 continue
+
+        # 結束總執行時間計時
+        self.total_end_time = datetime.now()
+        if self.total_start_time:
+            total_duration = self.total_end_time - self.total_start_time
+            self.total_execution_minutes = total_duration.total_seconds() / 60
+            safe_print(f"⏱️ 總執行結束時間: {self.total_end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            safe_print(f"📊 總執行時長: {self.total_execution_minutes:.2f} 分鐘")
 
         # 生成總報告
         self.generate_summary_report(results)
@@ -141,29 +164,60 @@ class MultiAccountManager:
         if security_warning_accounts:
             print(f"   密碼安全警告: {len(security_warning_accounts)}")
         print(f"   總下載檔案: {total_downloads}")
+        if hasattr(self, 'total_execution_minutes') and self.total_execution_minutes > 0:
+            print(f"   總執行時長: {self.total_execution_minutes:.2f} 分鐘")
 
         if successful_accounts:
             safe_print(f"\n✅ 成功帳號詳情:")
             for result in successful_accounts:
                 username = result["username"]
                 download_count = len(result["downloads"])
+                duration_minutes = result.get("duration_minutes", 0)
+                
                 if result.get("message") == "無資料可下載":
-                    safe_print(f"   🔸 {username}: 無資料可下載")
+                    safe_print(f"   🔸 {username}: 無資料可下載 (執行時間: {duration_minutes:.2f} 分鐘)")
                 else:
-                    safe_print(f"   🔸 {username}: 成功下載 {download_count} 個檔案")
+                    safe_print(f"   🔸 {username}: 成功下載 {download_count} 個檔案 (執行時間: {duration_minutes:.2f} 分鐘)")
+                
+                # 顯示期間詳細資訊（如果有的話）
+                period_details = result.get("period_details", [])
+                if period_details:
+                    safe_print(f"      📅 期間詳情:")
+                    for detail in period_details:
+                        period = detail["period"]
+                        start_date = detail["start_date"]
+                        end_date = detail["end_date"]
+                        status = detail["status"]
+                        file_count = len(detail["files"])
+                        
+                        if status == "success":
+                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ✅ 成功下載 {file_count} 個檔案")
+                        elif status == "no_records":
+                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ⚠️ 無交易記錄")
+                        elif status == "search_failed":
+                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ❌ 搜尋失敗")
+                        elif status == "download_failed":
+                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ❌ 下載失敗")
+                        elif status == "download_timeout":
+                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ⏰ 下載超時")
+                        else:
+                            error_msg = detail.get("error", "未知錯誤")
+                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ❌ {error_msg}")
 
         if security_warning_accounts:
             safe_print(f"\n🚨 密碼安全警告帳號詳情:")
             for result in security_warning_accounts:
                 username = result["username"]
-                safe_print(f"   🔸 {username}: 需要更新密碼才能繼續使用")
+                duration_minutes = result.get("duration_minutes", 0)
+                safe_print(f"   🔸 {username}: 需要更新密碼才能繼續使用 (執行時間: {duration_minutes:.2f} 分鐘)")
 
         if other_failed_accounts:
             safe_print(f"\n❌ 失敗帳號詳情:")
             for result in other_failed_accounts:
                 username = result["username"]
                 error = result.get("error", "未知錯誤")
-                safe_print(f"   🔸 {username}: {error}")
+                duration_minutes = result.get("duration_minutes", 0)
+                safe_print(f"   🔸 {username}: {error} (執行時間: {duration_minutes:.2f} 分鐘)")
 
         # 保存詳細報告
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -180,7 +234,10 @@ class MultiAccountManager:
                 "success": result["success"],
                 "username": result["username"],
                 "downloads": result["downloads"],
-                "records": len(result.get("records", [])) if result.get("records") else 0
+                "records": len(result.get("records", [])) if result.get("records") else 0,
+                "duration_minutes": result.get("duration_minutes", 0),
+                "start_time": result.get("start_time"),
+                "end_time": result.get("end_time")
             }
             if "error" in result:
                 clean_result["error"] = result["error"]
@@ -193,6 +250,9 @@ class MultiAccountManager:
         with open(report_file, 'w', encoding='utf-8') as f:
             json.dump({
                 "execution_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "total_start_time": self.total_start_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_start_time else None,
+                "total_end_time": self.total_end_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_end_time else None,
+                "total_execution_minutes": round(self.total_execution_minutes, 2) if hasattr(self, 'total_execution_minutes') else 0,
                 "total_accounts": len(results),
                 "successful_accounts": len(successful_accounts),
                 "failed_accounts": len(other_failed_accounts),

@@ -396,13 +396,19 @@ class UnpaidScraper(BaseScraper):
             timeout_indicators = [
                 'MsgCenter.aspx',
                 '系統閒置過久',
-                '請重新登入',
-                'TimeOut',
-                'Session'
+                '請重新登入'
             ]
 
-            # 檢查 URL
+            # 檢查 URL - 特別處理 TimeOut 參數
             if any(indicator in current_url for indicator in timeout_indicators):
+                return True
+            
+            # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
+            if 'TimeOut=Y' in current_url:
+                return True
+            
+            # 檢查其他 Session 相關但排除正常情況
+            if 'Session' in current_url and 'SessionExpired' in current_url:
                 return True
 
             # 檢查頁面內容
@@ -582,75 +588,251 @@ class UnpaidScraper(BaseScraper):
         safe_print(f"🔍 開始搜尋並下載 {self.periods} 個週期的交易明細...")
 
         downloaded_files = []
+        period_details = []  # 記錄每期的詳細情況
 
         try:
             # 為每個週期執行下載
             for period in range(1, self.periods + 1):
                 safe_print(f"\n📊 處理第 {period} 期...")
 
+                # 期間重置邏輯：第2期及以後需要重新準備頁面狀態
+                if period > 1:
+                    safe_print(f"🔄 準備第 {period} 期頁面狀態...")
+                    reset_success = self._reset_page_for_next_period()
+                    if not reset_success:
+                        safe_print(f"⚠️ 第 {period} 期頁面重置失敗，嘗試繼續...")
+
                 # 設定該週期的日期範圍
-                period_files = self._download_period_data(period)
-
-                if period_files:
-                    downloaded_files.extend(period_files)
-                    safe_print(f"✅ 第 {period} 期下載完成: {len(period_files)} 個檔案")
+                period_result = self._download_period_data_with_details(period)
+                
+                # 記錄每期詳細情況
+                period_details.append(period_result)
+                
+                if period_result["files"]:
+                    downloaded_files.extend(period_result["files"])
+                    safe_print(f"✅ 第 {period} 期下載完成: {len(period_result['files'])} 個檔案")
+                elif period_result["status"] == "no_records":
+                    safe_print(f"⚠️ 第 {period} 期無交易記錄 ({period_result['start_date']} - {period_result['end_date']})")
                 else:
-                    safe_print(f"⚠️ 第 {period} 期沒有資料")
+                    safe_print(f"⚠️ 第 {period} 期下載失敗: {period_result.get('error', '未知錯誤')}")
 
-                # 週期間等待
+                # 週期間等待（頁面重新整理後減少等待時間）
                 if period < self.periods:
-                    time.sleep(2)
+                    safe_print(f"⏳ 等待 3 秒後處理下一期...")
+                    time.sleep(3)
 
-            return downloaded_files
+            return downloaded_files, period_details
 
         except Exception as e:
             safe_print(f"❌ 週期搜尋和下載失敗: {e}")
-            return downloaded_files
+            return downloaded_files, period_details
 
-    def _download_period_data(self, period):
-        """下載特定週期的資料"""
-        safe_print(f"📥 下載第 {period} 期資料...")
-
+    def _reset_page_for_next_period(self):
+        """為下一期重置頁面狀態 - 直接導航到交易明細表URL"""
         try:
-            # 計算週期的開始和結束日期
-            start_date, end_date = self._calculate_period_dates(period)
-
-            safe_print(f"📅 第 {period} 期日期範圍: {start_date} - {end_date}")
-
-            # 記錄下載前的檔案
-            files_before = set(self.download_dir.glob("*"))
-
-            # 執行 AJAX 搜尋請求
-            search_success = self._perform_ajax_search(start_date, end_date)
-            if not search_success:
-                safe_print(f"❌ 第 {period} 期 AJAX 搜尋失敗")
-                return []
-
-            # 等待搜尋結果載入
-            download_ready = self._wait_for_search_results()
-            if not download_ready:
-                safe_print(f"⚠️ 第 {period} 期搜尋結果載入超時或無資料")
-                return []
-
-            # 點擊下載按鈕
-            download_success = self._click_download_button()
-            if not download_success:
-                safe_print(f"❌ 第 {period} 期下載按鈕點擊失敗")
-                return []
-
-            # 等待檔案下載
-            downloaded_files = self._wait_for_download(files_before)
-
-            if downloaded_files:
-                # 重命名檔案（格式：{帳號}_{開始日期}_{結束日期}）
-                renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
-                return renamed_files
-            else:
-                return []
+            safe_print("🔄 導航到交易明細表頁面刷新...")
+            
+            # 直接導航到交易明細表完整URL
+            transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
+            self.driver.get(transaction_url)
+            
+            # 等待頁面載入
+            time.sleep(5)
+            
+            safe_print("✅ 成功導航到交易明細表頁面")
+            return True
+            
+        except Exception as e:
+            safe_print(f"❌ 導航到交易明細表頁面失敗: {e}")
+            # 如果直接導航失敗，回到原本的導航方法
+            safe_print("🔄 使用原本的導航方法...")
+            return self.navigate_to_transaction_detail()
 
         except Exception as e:
-            safe_print(f"❌ 第 {period} 期資料下載失敗: {e}")
-            return []
+            safe_print(f"❌ 頁面重置失敗: {e}")
+            return False
+
+    def _download_period_data_with_details(self, period, max_retries=3):
+        """下載特定週期的資料並返回詳細信息，支援重試機制"""
+        safe_print(f"📥 下載第 {period} 期資料...")
+
+        # 計算週期的開始和結束日期
+        start_date, end_date = self._calculate_period_dates(period)
+        safe_print(f"📅 第 {period} 期日期範圍: {start_date} - {end_date}")
+
+        period_info = {
+            "period": period,
+            "start_date": start_date,
+            "end_date": end_date,
+            "status": "unknown",
+            "files": [],
+            "error": None,
+            "record_count": 0
+        }
+
+        for retry in range(max_retries):
+            try:
+                if retry > 0:
+                    safe_print(f"🔄 第 {period} 期第 {retry + 1} 次重試...")
+                    # 重新載入頁面
+                    transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
+                    self.driver.get(transaction_url)
+                    time.sleep(5)
+
+                # 記錄下載前的檔案
+                files_before = set(self.download_dir.glob("*"))
+
+                # 執行 AJAX 搜尋請求
+                search_success = self._perform_ajax_search(start_date, end_date)
+                if not search_success:
+                    safe_print(f"⚠️ 第 {period} 期 AJAX 搜尋失敗")
+                    if retry < max_retries - 1:
+                        continue
+                    else:
+                        period_info["status"] = "search_failed"
+                        period_info["error"] = "AJAX 搜尋失敗"
+                        return period_info
+
+                # 等待搜尋結果載入
+                download_ready = self._wait_for_search_results()
+                if not download_ready:
+                    safe_print(f"⚠️ 第 {period} 期搜尋結果載入超時或無資料")
+                    if retry < max_retries - 1:
+                        continue
+                    else:
+                        period_info["status"] = "no_results"
+                        period_info["error"] = "搜尋結果載入超時"
+                        return period_info
+
+                # 檢查記錄筆數
+                records_available = self._check_records_count()
+                if not records_available:
+                    safe_print(f"⚠️ 第 {period} 期無交易記錄，跳過下載")
+                    period_info["status"] = "no_records"
+                    period_info["record_count"] = 0
+                    return period_info
+                
+                # 點擊下載按鈕
+                download_success = self._click_download_button()
+                if not download_success:
+                    safe_print(f"⚠️ 第 {period} 期下載按鈕點擊失敗")
+                    if retry < max_retries - 1:
+                        continue
+                    else:
+                        period_info["status"] = "download_failed"
+                        period_info["error"] = "下載按鈕點擊失敗"
+                        return period_info
+
+                # 等待檔案下載（30秒超時）
+                downloaded_files = self._wait_for_download(files_before, timeout=30)
+
+                if downloaded_files:
+                    # 重命名檔案（格式：{帳號}_{開始日期}_{結束日期}）
+                    renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
+                    safe_print(f"✅ 第 {period} 期下載成功")
+                    period_info["status"] = "success"
+                    period_info["files"] = renamed_files
+                    return period_info
+                else:
+                    if retry < max_retries - 1:
+                        safe_print(f"⚠️ 第 {period} 期下載超時，將重試...")
+                        continue
+                    else:
+                        safe_print(f"❌ 第 {period} 期下載失敗（所有重試完畢）")
+                        period_info["status"] = "download_timeout"
+                        period_info["error"] = "下載超時"
+                        return period_info
+
+            except Exception as e:
+                if retry < max_retries - 1:
+                    safe_print(f"⚠️ 第 {period} 期下載異常 (第 {retry + 1} 次): {e}")
+                    safe_print("🔄 將重試...")
+                else:
+                    safe_print(f"❌ 第 {period} 期資料下載失敗 (所有重試完畢): {e}")
+                    period_info["status"] = "error"
+                    period_info["error"] = str(e)
+                    return period_info
+
+        return period_info
+
+    def _download_period_data(self, period, max_retries=3):
+        """下載特定週期的資料，支援重試機制"""
+        safe_print(f"📥 下載第 {period} 期資料...")
+
+        # 計算週期的開始和結束日期
+        start_date, end_date = self._calculate_period_dates(period)
+        safe_print(f"📅 第 {period} 期日期範圍: {start_date} - {end_date}")
+
+        for retry in range(max_retries):
+            try:
+                if retry > 0:
+                    safe_print(f"🔄 第 {period} 期第 {retry + 1} 次重試...")
+                    # 重新載入頁面
+                    transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
+                    self.driver.get(transaction_url)
+                    time.sleep(5)
+
+                # 記錄下載前的檔案
+                files_before = set(self.download_dir.glob("*"))
+
+                # 執行 AJAX 搜尋請求
+                search_success = self._perform_ajax_search(start_date, end_date)
+                if not search_success:
+                    safe_print(f"⚠️ 第 {period} 期 AJAX 搜尋失敗")
+                    if retry < max_retries - 1:
+                        continue
+                    else:
+                        return []
+
+                # 等待搜尋結果載入
+                download_ready = self._wait_for_search_results()
+                if not download_ready:
+                    safe_print(f"⚠️ 第 {period} 期搜尋結果載入超時或無資料")
+                    if retry < max_retries - 1:
+                        continue
+                    else:
+                        return []
+
+                # 檢查記錄筆數
+                records_available = self._check_records_count()
+                if not records_available:
+                    safe_print(f"⚠️ 第 {period} 期無交易記錄，跳過下載")
+                    return []
+                
+                # 點擊下載按鈕
+                download_success = self._click_download_button()
+                if not download_success:
+                    safe_print(f"⚠️ 第 {period} 期下載按鈕點擊失敗")
+                    if retry < max_retries - 1:
+                        continue
+                    else:
+                        return []
+
+                # 等待檔案下載（30秒超時）
+                downloaded_files = self._wait_for_download(files_before, timeout=30)
+
+                if downloaded_files:
+                    # 重命名檔案（格式：{帳號}_{開始日期}_{結束日期}）
+                    renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
+                    safe_print(f"✅ 第 {period} 期下載成功")
+                    return renamed_files
+                else:
+                    if retry < max_retries - 1:
+                        safe_print(f"⚠️ 第 {period} 期下載超時，將重試...")
+                        continue
+                    else:
+                        safe_print(f"❌ 第 {period} 期下載失敗（所有重試完畢）")
+                        return []
+
+            except Exception as e:
+                if retry < max_retries - 1:
+                    safe_print(f"⚠️ 第 {period} 期下載異常 (第 {retry + 1} 次): {e}")
+                    safe_print("🔄 將重試...")
+                else:
+                    safe_print(f"❌ 第 {period} 期資料下載失敗 (所有重試完畢): {e}")
+                    return []
+
+        return []
 
     def _calculate_period_dates(self, period):
         """計算週期的開始和結束日期"""
@@ -817,86 +999,175 @@ class UnpaidScraper(BaseScraper):
         safe_print("⚠️ 搜尋結果載入超時，可能沒有符合條件的資料")
         return False
 
-    def _click_download_button(self):
-        """點擊交易明細下載按鈕"""
+    def _click_download_button(self, max_retries=3):
+        """點擊交易明細下載按鈕，支援重試機制"""
         safe_print("🖱️ 點擊交易明細下載按鈕...")
 
-        try:
-            download_button = None
+        for retry in range(max_retries):
+            try:
+                if retry > 0:
+                    safe_print(f"🔄 第 {retry + 1} 次重試點擊下載按鈕...")
+                    time.sleep(2)  # 等待頁面穩定
 
-            # 方法1: 嘗試多種可能的下載按鈕 ID
-            download_button_ids = ["lnkbtnDownload", "btnDownload", "lnkDownload"]
+                download_button = None
 
-            for button_id in download_button_ids:
-                try:
-                    download_button = self.driver.find_element(By.ID, button_id)
-                    if download_button and download_button.is_displayed() and download_button.is_enabled():
-                        safe_print(f"✅ 找到下載按鈕: {button_id} (ID)")
-                        break
-                except:
-                    continue
+                # 方法1: 嘗試多種可能的下載按鈕 ID (重新查找)
+                download_button_ids = ["lnkbtnDownload", "btnDownload", "lnkDownload"]
 
-            # 方法2: 如果沒找到特定 ID，嘗試文字搜尋
-            if not download_button:
-                backup_selectors = [
-                    ("LINK_TEXT", "交易明細下載"),
-                    ("PARTIAL_LINK_TEXT", "明細下載"),
-                    ("PARTIAL_LINK_TEXT", "下載"),
-                    ("XPATH", "//a[contains(text(), '交易明細下載')]"),
-                    ("XPATH", "//a[contains(text(), '明細下載')]"),
-                    ("XPATH", "//a[contains(text(), '下載')]"),
-                    ("CSS", "a[href*='Download']"),
-                    ("CSS", "input[value*='下載']"),
-                    ("CSS", "button[value*='下載']")
-                ]
-
-                for method, selector in backup_selectors:
+                for button_id in download_button_ids:
                     try:
-                        if method == "LINK_TEXT":
-                            download_button = self.driver.find_element(By.LINK_TEXT, selector)
-                        elif method == "PARTIAL_LINK_TEXT":
-                            download_button = self.driver.find_element(By.PARTIAL_LINK_TEXT, selector)
-                        elif method == "XPATH":
-                            download_button = self.driver.find_element(By.XPATH, selector)
-                        elif method == "CSS":
-                            download_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-
+                        # 每次都重新查找元素，避免 stale reference
+                        download_button = self.driver.find_element(By.ID, button_id)
                         if download_button and download_button.is_displayed() and download_button.is_enabled():
-                            safe_print(f"✅ 找到備用下載按鈕: {method}={selector}")
+                            safe_print(f"✅ 找到下載按鈕: {button_id} (ID)")
                             break
-
-                    except Exception:
+                    except:
                         continue
 
-            if not download_button:
-                safe_print("❌ 找不到任何下載按鈕，可能沒有資料可下載")
-                return False
+                # 方法2: 如果沒找到特定 ID，嘗試文字搜尋
+                if not download_button:
+                    backup_selectors = [
+                        ("LINK_TEXT", "交易明細下載"),
+                        ("PARTIAL_LINK_TEXT", "明細下載"),
+                        ("PARTIAL_LINK_TEXT", "下載"),
+                        ("XPATH", "//a[contains(text(), '交易明細下載')]"),
+                        ("XPATH", "//a[contains(text(), '明細下載')]"),
+                        ("XPATH", "//a[contains(text(), '下載')]"),
+                        ("CSS", "a[href*='Download']"),
+                        ("CSS", "input[value*='下載']"),
+                        ("CSS", "button[value*='下載']")
+                    ]
 
-            # 點擊下載按鈕
-            safe_print("🖱️ 執行下載點擊...")
+                    for method, selector in backup_selectors:
+                        try:
+                            if method == "LINK_TEXT":
+                                download_button = self.driver.find_element(By.LINK_TEXT, selector)
+                            elif method == "PARTIAL_LINK_TEXT":
+                                download_button = self.driver.find_element(By.PARTIAL_LINK_TEXT, selector)
+                            elif method == "XPATH":
+                                download_button = self.driver.find_element(By.XPATH, selector)
+                            elif method == "CSS":
+                                download_button = self.driver.find_element(By.CSS_SELECTOR, selector)
 
-            # 使用 JavaScript 點擊以避免攔截問題
-            self.driver.execute_script("arguments[0].click();", download_button)
+                            if download_button and download_button.is_displayed() and download_button.is_enabled():
+                                safe_print(f"✅ 找到備用下載按鈕: {method}={selector}")
+                                break
 
-            # 處理可能的確認對話框
-            time.sleep(1)
+                        except Exception:
+                            continue
+
+                if not download_button:
+                    if retry < max_retries - 1:
+                        safe_print("⚠️ 本次未找到下載按鈕，將重試...")
+                        continue
+                    else:
+                        safe_print("❌ 找不到任何下載按鈕，可能沒有資料可下載")
+                        return False
+
+                # 點擊下載按鈕
+                safe_print("🖱️ 執行下載點擊...")
+
+                # 使用 JavaScript 點擊以避免攔截問題
+                self.driver.execute_script("arguments[0].click();", download_button)
+
+                # 處理可能的確認對話框
+                time.sleep(1)
+                try:
+                    alert = self.driver.switch_to.alert
+                    alert_text = alert.text
+                    safe_print(f"🔔 發現確認對話框: {alert_text}")
+                    alert.accept()
+                    safe_print("✅ 已確認下載")
+                except Exception:
+                    pass  # 沒有對話框
+
+                safe_print("✅ 下載按鈕點擊成功")
+                return True
+
+            except Exception as e:
+                if retry < max_retries - 1:
+                    safe_print(f"⚠️ 點擊下載按鈕失敗 (第 {retry + 1} 次): {e}")
+                    safe_print("🔄 將重試...")
+                else:
+                    safe_print(f"❌ 點擊下載按鈕失敗 (所有重試完畢): {e}")
+                    return False
+
+        # 如果所有重試都失敗
+        safe_print("❌ 下載按鈕點擊失敗，已用盡所有重試")
+        return False
+
+    def _check_records_count(self):
+        """檢查交易記錄筆數，避免下載空資料"""
+        try:
+            safe_print("🔍 檢查交易記錄筆數...")
+            
+            # 查找包含筆數資訊的元素
+            count_element = None
+            
+            # 方法1: 直接尋找 lblTotleCount ID
             try:
-                alert = self.driver.switch_to.alert
-                alert_text = alert.text
-                safe_print(f"🔔 發現確認對話框: {alert_text}")
-                alert.accept()
-                safe_print("✅ 已確認下載")
-            except Exception:
-                pass  # 沒有對話框
-
-            safe_print("✅ 下載按鈕點擊成功")
+                count_element = self.driver.find_element(By.ID, "lblTotleCount")
+                safe_print("✅ 找到筆數元素 (lblTotleCount)")
+            except:
+                # 方法2: 尋找包含 "交易共" 和 "筆" 的文字
+                try:
+                    count_elements = self.driver.find_elements(By.XPATH, "//span[contains(@style, 'color:Red;') or contains(@style, 'color:red;')]")
+                    for element in count_elements:
+                        if element.text.isdigit():
+                            count_element = element
+                            safe_print("✅ 找到筆數元素 (通過紅色文字)")
+                            break
+                except:
+                    pass
+            
+            if count_element:
+                try:
+                    count_text = count_element.text.strip()
+                    record_count = int(count_text)
+                    safe_print(f"📊 交易記錄筆數: {record_count} 筆")
+                    
+                    if record_count > 0:
+                        safe_print("✅ 有交易記錄，可以執行下載")
+                        return True
+                    else:
+                        safe_print("⚠️ 交易記錄筆數為 0，跳過下載避免空轉")
+                        return False
+                        
+                except ValueError:
+                    safe_print(f"⚠️ 無法解析筆數文字: {count_text}")
+                    # 如果無法解析，謹慎起見還是允許下載
+                    return True
+            else:
+                safe_print("⚠️ 未找到筆數元素，檢查頁面內容...")
+                
+                # 備用方法：檢查頁面源碼
+                page_source = self.driver.page_source
+                
+                # 尋找 "交易共 X 筆" 的模式
+                import re
+                pattern = r'交易共.*?(\d+).*?筆'
+                match = re.search(pattern, page_source)
+                
+                if match:
+                    record_count = int(match.group(1))
+                    safe_print(f"📊 通過頁面內容檢測到交易記錄筆數: {record_count} 筆")
+                    
+                    if record_count > 0:
+                        safe_print("✅ 有交易記錄，可以執行下載")
+                        return True
+                    else:
+                        safe_print("⚠️ 交易記錄筆數為 0，跳過下載避免空轉")
+                        return False
+                else:
+                    safe_print("⚠️ 無法檢測筆數，為安全起見允許下載")
+                    return True
+                    
+        except Exception as e:
+            safe_print(f"❌ 檢查記錄筆數時發生錯誤: {e}")
+            # 發生錯誤時謹慎起見還是允許下載
             return True
 
-        except Exception as e:
-            safe_print(f"❌ 點擊下載按鈕失敗: {e}")
-            return False
-
-    def _wait_for_download(self, files_before, timeout=60):
+    def _wait_for_download(self, files_before, timeout=30):
         """等待檔案下載完成"""
         safe_print(f"⏳ 等待檔案下載完成（最多 {timeout} 秒）...")
 
@@ -953,6 +1224,9 @@ class UnpaidScraper(BaseScraper):
         """執行完整的交易明細查詢自動化流程"""
         downloaded_files = []
 
+        # 開始執行時間計時
+        self.start_execution_timer()
+
         try:
             print("=" * 60)
             safe_print(f"🚛 開始執行黑貓宅急便交易明細查詢流程 (帳號: {self.username})")
@@ -1000,14 +1274,15 @@ class UnpaidScraper(BaseScraper):
                 safe_print(f"⚠️ 帳號 {self.username} 週期設定失敗，但繼續執行")
 
             # 5. 搜尋並下載各週期的交易明細
-            downloaded_files = self.search_and_download_periods()
+            downloaded_files, period_details = self.search_and_download_periods()
 
             if downloaded_files:
                 safe_print(f"🎉 帳號 {self.username} 交易明細查詢流程完成！下載了 {len(downloaded_files)} 個檔案")
                 return {
                     "success": True,
                     "username": self.username,
-                    "downloads": [str(f) for f in downloaded_files]
+                    "downloads": [str(f) for f in downloaded_files],
+                    "period_details": period_details
                 }
             else:
                 safe_print(f"⚠️ 帳號 {self.username} 沒有下載到檔案")
@@ -1015,7 +1290,8 @@ class UnpaidScraper(BaseScraper):
                     "success": True,
                     "username": self.username,
                     "message": "無資料可下載",
-                    "downloads": []
+                    "downloads": [],
+                    "period_details": period_details
                 }
 
         except Exception as e:
@@ -1024,9 +1300,12 @@ class UnpaidScraper(BaseScraper):
                 "success": False,
                 "username": self.username,
                 "error": str(e),
-                "downloads": [str(f) for f in downloaded_files]
+                "downloads": [str(f) for f in downloaded_files],
+                "period_details": getattr(locals(), 'period_details', [])
             }
         finally:
+            # 結束執行時間計時
+            self.end_execution_timer()
             self.close()
 
 

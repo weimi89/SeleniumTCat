@@ -80,11 +80,11 @@ SeleniumTCat/
 
 本專案包含三個專門的爬蟲工具，各自針對不同的黑貓宅急便功能進行優化：
 
-1. **PaymentScraper** (`src/scrapers/payment_scraper.py`): 貨到付款查詢工具
-   - **功能**: 下載貨到付款匯款明細
+1. **PaymentScraper** (`src/scrapers/payment_scraper.py`): 客樂得對帳單查詢工具
+   - **功能**: 下載貨到付款匯款明細（客樂得對帳單）
    - **繼承**: BaseScraper 實作貨到付款匯款明細查詢
    - **特色**: 自動選擇最新一期結算區間，無需手動指定日期範圍
-   - **週期設定**: 支援命令列 `--period` 參數指定下載期數
+   - **週期設定**: 支援命令列 `--period` 參數指定下載期數，預設 2 期
    - **檔案命名**: `{帳號}_{payment_no}.xlsx`
    - **下載方式**: 點擊連結下載 Excel 檔案
 
@@ -139,55 +139,55 @@ uv sync  # 使用 pyproject.toml 管理依賴
 
 ### 執行黑貓宅急便工具
 
-#### 貨到付款查詢
+#### 客樂得對帳單（貨到付款查詢）
 ```bash
 # Windows 使用者（推薦）：
-run_payment.cmd
+Windows_客樂得對帳單.cmd
 
 # Linux/macOS 使用者：
-./run_payment.sh
+./Linux_客樂得對帳單.sh
 
 # 指定下載期數
-run_payment.cmd --period 3  # Windows
-./run_payment.sh --period 3  # Linux/macOS
+Windows_客樂得對帳單.cmd --period 3  # Windows
+./Linux_客樂得對帳單.sh --period 3  # Linux/macOS
 
 # 無頭模式
-run_payment.cmd --headless  # Windows
-./run_payment.sh --headless  # Linux/macOS
+Windows_客樂得對帳單.cmd --headless  # Windows
+./Linux_客樂得對帳單.sh --headless  # Linux/macOS
 ```
 
-#### 運費查詢
+#### 運費查詢（發票明細）
 ```bash
 # Windows 使用者：
-run_freight.cmd
+Windows_發票明細.cmd
 
 # Linux/macOS 使用者：
-./run_freight.sh
+./Linux_發票明細.sh
 
 # 指定日期範圍
-run_freight.cmd --start-date 20241201 --end-date 20241208  # Windows
-./run_freight.sh --start-date 20241201 --end-date 20241208  # Linux/macOS
+Windows_發票明細.cmd --start-date 20241201 --end-date 20241208  # Windows
+./Linux_發票明細.sh --start-date 20241201 --end-date 20241208  # Linux/macOS
 ```
 
 #### 交易明細表查詢
 ```bash
 # Windows 使用者：
-run_unpaid.cmd
+Windows_客戶交易明細.cmd
 
 # Linux/macOS 使用者：
-./run_unpaid.sh
+./Linux_客戶交易明細.sh
 
 # 指定週期數量
-run_unpaid.cmd --periods 3  # Windows
-./run_unpaid.sh --periods 3  # Linux/macOS
+Windows_客戶交易明細.cmd --periods 3  # Windows
+./Linux_客戶交易明細.sh --periods 3  # Linux/macOS
 ```
 
 ### 手動執行（需要先設定環境變數）
 ```bash
-# 貨到付款查詢
+# 客樂得對帳單（貨到付款查詢）
 PYTHONPATH="$(pwd)" uv run python -u src/scrapers/payment_scraper.py
 
-# 運費查詢
+# 運費查詢（發票明細）
 PYTHONPATH="$(pwd)" uv run python -u src/scrapers/freight_scraper.py
 
 # 交易明細表查詢
