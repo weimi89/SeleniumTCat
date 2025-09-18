@@ -47,9 +47,12 @@ class BaseScraper:
         # 初始化 ddddocr
         self.ocr = ddddocr.DdddOcr(show_ad=False)
 
-        # 所有帳號使用同一個下載目錄
-        self.download_dir = Path(download_base_dir)
-        self.download_dir.mkdir(parents=True, exist_ok=True)
+        # 所有檔案都放在同一層的下載目錄
+        self.final_download_dir = Path(download_base_dir)
+        self.final_download_dir.mkdir(parents=True, exist_ok=True)
+
+        # download_dir 將在每次下載時動態設定為 UUID 臨時目錄
+        self.download_dir = None
 
         # 建立專屬資料夾
         self.reports_dir = Path("reports")
@@ -62,9 +65,13 @@ class BaseScraper:
 
     def init_browser(self):
         """初始化瀏覽器"""
+        # 使用預設的 downloads 目錄初始化瀏覽器
+        # 實際的 UUID 臨時目錄將在需要下載時才建立
+        default_download_dir = self.final_download_dir
+        
         self.driver, self.wait = init_chrome_browser(
             headless=self.headless,
-            download_dir=str(self.download_dir.absolute())
+            download_dir=str(default_download_dir.absolute())
         )
 
     def solve_captcha(self, captcha_img_element):
@@ -90,7 +97,7 @@ class BaseScraper:
 
         for attempt in range(1, max_attempts + 1):
             safe_print(f"🔄 第 {attempt}/{max_attempts} 次登入嘗試")
-            
+
             # 前往登入頁面
             self.driver.get(self.url)
             time.sleep(2)
@@ -412,3 +419,97 @@ class BaseScraper:
                 "duration_minutes": 0,
                 "security_warning": self.security_warning_encountered
             }
+
+    def set_download_directory(self, download_path):
+        """動態設定 Chrome 下載目錄"""
+        try:
+            self.driver.execute_cdp_cmd('Page.setDownloadBehavior', {
+                'behavior': 'allow',
+                'downloadPath': str(download_path.absolute())
+            })
+            safe_print(f"✅ 已設定下載目錄: {download_path}")
+            return True
+        except Exception as e:
+            safe_print(f"⚠️ 設定下載目錄失敗: {e}")
+            return False
+
+    def setup_temp_download_dir(self):
+        """
+        建立並設定新的 UUID 臨時下載目錄
+        如果瀏覽器已啟動，會動態設定下載目錄
+        """
+        import uuid
+        temp_uuid = str(uuid.uuid4())
+        self.download_dir = Path("temp") / temp_uuid
+        self.download_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 如果瀏覽器已經啟動，動態設定下載目錄
+        if hasattr(self, 'driver') and self.driver:
+            self.set_download_directory(self.download_dir)
+        
+        safe_print(f"📁 建立臨時下載目錄: {self.download_dir}")
+
+    def create_temp_download_dir(self):
+        """
+        為本次下載建立唯一的 UUID 臨時目錄 (向後相容方法)
+        Returns:
+            臨時下載目錄的 Path 物件
+        """
+        self.setup_temp_download_dir()
+        return self.download_dir
+
+    def move_and_cleanup_files(self, downloaded_files, renamed_files):
+        """
+        將重命名後的檔案從臨時目錄移動到最終下載目錄，並清理臨時目錄
+        
+        Args:
+            downloaded_files: 原始下載的檔案清單
+            renamed_files: 重命名後的檔案清單
+            
+        Returns:
+            最終目錄中的檔案清單
+        """
+        final_files = []
+
+        try:
+            import shutil
+            safe_print(f"📁 移動檔案從臨時目錄 {self.download_dir} 到 {self.final_download_dir}")
+
+            for renamed_file in renamed_files:
+                if isinstance(renamed_file, Path):
+                    source_file = renamed_file
+                else:
+                    source_file = Path(renamed_file)
+
+                # 目標檔案路徑
+                target_file = self.final_download_dir / source_file.name
+
+                # 如果目標檔案存在，先刪除（覆蓋）
+                if target_file.exists():
+                    safe_print(f"⚠️ 目標檔案已存在，將覆蓋: {target_file.name}")
+                    target_file.unlink()
+
+                # 移動檔案
+                shutil.move(str(source_file), str(target_file))
+                final_files.append(target_file)
+                safe_print(f"✅ 檔案已移動: {source_file.name} → {target_file}")
+
+            # 清理臨時目錄
+            self._cleanup_temp_directory(self.download_dir)
+
+        except Exception as e:
+            safe_print(f"❌ 檔案移動失敗: {e}")
+            # 即使移動失敗，也嘗試清理臨時目錄
+            self._cleanup_temp_directory(self.download_dir)
+
+        return final_files
+
+    def _cleanup_temp_directory(self, temp_dir):
+        """清理臨時下載目錄"""
+        try:
+            if temp_dir.exists():
+                import shutil
+                shutil.rmtree(temp_dir)
+                safe_print(f"🗑️ 已清理臨時目錄: {temp_dir}")
+        except Exception as e:
+            safe_print(f"⚠️ 清理臨時目錄失敗: {e}")

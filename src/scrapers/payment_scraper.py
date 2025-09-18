@@ -902,6 +902,9 @@ class PaymentScraper(BaseScraper):
     def download_cod_statement(self):
         """下載貨到付款匯款明細表"""
         safe_print("📥 開始下載貨到付款匯款明細表...")
+        
+        # 設定本次下載的 UUID 臨時目錄
+        self.setup_temp_download_dir()
 
         try:
             # 等待頁面載入
@@ -1197,7 +1200,7 @@ class PaymentScraper(BaseScraper):
                         # 重新命名為目標檔案名
                         latest_file.rename(target_file_path)
                         print(f"   📝 檔案已重新命名: {latest_file.name} -> {target_filename}")
-                        return [target_file_path]
+                        return self.move_and_cleanup_files([target_file_path], [target_file_path])
 
                     except Exception as rename_e:
                         print(f"   ⚠️ 檔案重新命名失敗: {rename_e}")
@@ -1208,10 +1211,10 @@ class PaymentScraper(BaseScraper):
                             backup_file_path = self.download_dir / backup_filename
                             latest_file.rename(backup_file_path)
                             print(f"   🔄 使用備用檔案名: {backup_filename}")
-                            return [backup_file_path]
+                            return self.move_and_cleanup_files([backup_file_path], [backup_file_path])
                         except Exception as backup_e:
                             print(f"   ❌ 備用重命名也失敗: {backup_e}")
-                            return [latest_file]
+                            return self.move_and_cleanup_files([latest_file], [latest_file])
 
                 return []
             else:

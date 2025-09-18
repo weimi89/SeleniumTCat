@@ -655,6 +655,9 @@ class UnpaidScraper(BaseScraper):
     def _download_period_data_with_details(self, period, max_retries=3):
         """下載特定週期的資料並返回詳細信息，支援重試機制"""
         safe_print(f"📥 下載第 {period} 期資料...")
+        
+        # 設定本次下載的 UUID 臨時目錄
+        self.setup_temp_download_dir()
 
         # 計算週期的開始和結束日期
         start_date, end_date = self._calculate_period_dates(period)
@@ -729,9 +732,11 @@ class UnpaidScraper(BaseScraper):
                 if downloaded_files:
                     # 重命名檔案（格式：{帳號}_{開始日期}_{結束日期}）
                     renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
+                    # 使用檔案移動機制將檔案從臨時目錄移動到最終目錄
+                    final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
                     safe_print(f"✅ 第 {period} 期下載成功")
                     period_info["status"] = "success"
-                    period_info["files"] = renamed_files
+                    period_info["files"] = final_files
                     return period_info
                 else:
                     if retry < max_retries - 1:
@@ -814,8 +819,10 @@ class UnpaidScraper(BaseScraper):
                 if downloaded_files:
                     # 重命名檔案（格式：{帳號}_{開始日期}_{結束日期}）
                     renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
+                    # 使用新的檔案移動機制
+                    final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
                     safe_print(f"✅ 第 {period} 期下載成功")
-                    return renamed_files
+                    return final_files
                 else:
                     if retry < max_retries - 1:
                         safe_print(f"⚠️ 第 {period} 期下載超時，將重試...")

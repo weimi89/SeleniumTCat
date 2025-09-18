@@ -753,6 +753,9 @@ class FreightScraper(BaseScraper):
     def _download_results(self):
         """下載搜尋結果"""
         safe_print("📥 開始下載搜尋結果...")
+        
+        # 設定本次下載的 UUID 臨時目錄
+        self.setup_temp_download_dir()
 
         try:
             # 首先解析表格資料以獲取發票資訊
@@ -829,8 +832,10 @@ class FreightScraper(BaseScraper):
             if downloaded_files:
                 # 重命名檔案（格式：{帳號}_{發票日期}_{發票號碼}）
                 renamed_files = self._rename_downloaded_files_with_invoice_info(downloaded_files, invoice_data)
-                safe_print(f"✅ 成功下載並重命名 {len(renamed_files)} 個檔案")
-                return renamed_files
+                # 使用新的檔案移動機制
+                final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
+                safe_print(f"✅ 成功下載並重命名 {len(final_files)} 個檔案")
+                return final_files
             else:
                 safe_print("⚠️ 沒有檢測到新的下載檔案")
                 return []
@@ -974,47 +979,7 @@ class FreightScraper(BaseScraper):
 
         return renamed_files
 
-    def _rename_downloaded_files(self, downloaded_files):
-        """重命名下載的檔案（備用方法）"""
-        renamed_files = []
 
-        for file_path in downloaded_files:
-            try:
-                # 生成新的檔案名稱（格式：{帳號}_{發票日期}_{發票號碼}）
-                # 這裡使用月份範圍作為日期部分，實際可能需要從檔案內容或頁面獲取具體發票信息
-                original_name = file_path.stem
-                extension = file_path.suffix
-
-                # 簡化的命名格式
-                new_name = f"{self.username}_{self.start_date}-{self.end_date}_{original_name}{extension}"
-                new_path = file_path.parent / new_name
-
-                # 如果目標檔案已存在，添加序號
-                counter = 1
-                while new_path.exists():
-                    base_name = f"{self.username}_{self.start_date}-{self.end_date}_{original_name}_{counter}{extension}"
-                    new_path = file_path.parent / base_name
-                    counter += 1
-
-                file_path.rename(new_path)
-                renamed_files.append(new_path)
-                safe_print(f"✅ 檔案重命名: {file_path.name} → {new_path.name}")
-
-            except Exception as e:
-                safe_print(f"⚠️ 檔案重命名失敗 {file_path.name}: {e}")
-                # 即使重命名失敗，也要確保檔案有唯一名稱
-                try:
-                    import uuid
-                    backup_filename = f"運費明細_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
-                    backup_file_path = file_path.parent / backup_filename
-                    file_path.rename(backup_file_path)
-                    renamed_files.append(backup_file_path)
-                    safe_print(f"🔄 使用備用檔案名: {backup_filename}")
-                except Exception as backup_e:
-                    safe_print(f"❌ 備用重命名也失敗: {backup_e}")
-                    renamed_files.append(file_path)  # 最後手段：保留原始檔案
-
-        return renamed_files
 
     def run_full_process(self):
         """執行完整的運費查詢自動化流程"""
