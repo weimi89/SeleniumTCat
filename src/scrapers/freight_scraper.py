@@ -56,6 +56,7 @@ class FreightScraper(BaseScraper):
                     last_day = start_dt.replace(month=start_dt.month + 1, day=1) - timedelta(days=1)
                 self.end_date = last_day.strftime("%Y%m%d")
             else:
+                # 取得上個月的最後一天
                 last_month = datetime.now().replace(day=1) - timedelta(days=1)
                 self.end_date = last_month.strftime("%Y%m%d")
 
