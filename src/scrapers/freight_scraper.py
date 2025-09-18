@@ -67,7 +67,7 @@ class FreightScraper(BaseScraper):
         safe_print("🧭 導航到對帳單明細頁面...")
 
         max_attempts = 3  # 最多嘗試 3 次
-        
+
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
@@ -132,7 +132,7 @@ class FreightScraper(BaseScraper):
                         home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
                         self.driver.get(home_url)
                         time.sleep(3)
-                        
+
                         # 檢查是否需要重新登入
                         if 'Login.aspx' in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
@@ -168,11 +168,11 @@ class FreightScraper(BaseScraper):
 
             for url_index, full_url in enumerate(direct_urls):
                 safe_print(f"🎯 嘗試 URL {url_index + 1}/{len(direct_urls)}: {full_url}")
-                
+
                 for retry in range(max_retries + 1):
                     if retry > 0:
                         print(f"      重試 {retry}/{max_retries}...")
-                    
+
                     try:
                         self.driver.get(full_url)
                         time.sleep(2)  # 短暫等待以檢測 alert
@@ -186,7 +186,7 @@ class FreightScraper(BaseScraper):
                             print("   🔔 處理了安全提示或其他彈窗")
 
                         time.sleep(3)  # 等待頁面完全載入
-                        
+
                         current_url = self.driver.current_url
                         print(f"   導航後 URL: {current_url}")
 
@@ -419,13 +419,19 @@ class FreightScraper(BaseScraper):
             timeout_indicators = [
                 'MsgCenter.aspx',
                 '系統閒置過久',
-                '請重新登入',
-                'TimeOut',
-                'Session'
+                '請重新登入'
             ]
 
-            # 檢查 URL
+            # 檢查 URL - 使用更精確的檢查
             if any(indicator in current_url for indicator in timeout_indicators):
+                return True
+
+            # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
+            if 'TimeOut=Y' in current_url:
+                return True
+
+            # 檢查其他 Session 相關但排除正常情況
+            if 'Session' in current_url and 'SessionExpired' in current_url:
                 return True
 
             # 檢查頁面內容
@@ -473,7 +479,7 @@ class FreightScraper(BaseScraper):
             ]
 
             login_success = False
-            
+
             for login_url in login_urls:
                 try:
                     print(f"   嘗試登入 URL: {login_url}")
@@ -486,15 +492,15 @@ class FreightScraper(BaseScraper):
                     # 檢查是否成功到達登入頁面
                     if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
                         print("   ✅ 成功到達登入頁面")
-                        
+
                         # 重新執行登入流程
                         login_success = self.login()
                         if login_success:
                             safe_print("✅ 會話超時後重新登入成功")
-                            
+
                             # 等待登入完成並驗證
                             time.sleep(5)
-                            
+
                             # 驗證登入是否真的成功
                             if not self._check_session_timeout():
                                 print("   ✅ 登入驗證成功，會話有效")
@@ -515,24 +521,24 @@ class FreightScraper(BaseScraper):
 
             if not login_success:
                 safe_print("❌ 所有重新登入嘗試都失敗")
-                
+
                 # 最後嘗試：重新初始化瀏覽器會話
                 try:
                     safe_print("🔄 嘗試重新初始化瀏覽器會話...")
-                    
+
                     # 刪除所有 cookies
                     self.driver.delete_all_cookies()
-                    
+
                     # 回到首頁
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
                     time.sleep(3)
-                    
+
                     # 再次嘗試登入
                     final_login_success = self.login()
                     if final_login_success:
                         safe_print("✅ 重新初始化後登入成功")
                         return True
-                        
+
                 except Exception as reinit_e:
                     safe_print(f"❌ 重新初始化失敗: {reinit_e}")
 
