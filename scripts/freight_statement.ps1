@@ -33,29 +33,45 @@ try {
     $env:PYTHONPATH = $PWD.Path
 
 
-    # 詢問下載期數（如果命令列沒有指定）
-    if (-not ($args -contains "--period")) {
-        Write-Host "📅 下載範圍設定" -ForegroundColor Yellow
-        Write-Host "請輸入要下載的期數："
-        Write-Host "• 1 = 下載最新 1 期"
-        Write-Host "• 3 = 下載最新 3 期"
-        Write-Host "• 0 或空白 = 下載最新 1 期（預設）"
+    # 詢問日期範圍（如果命令列沒有指定）
+    if (-not ($args -contains "--start-date") -and -not ($args -contains "--end-date")) {
+        Write-Host "📅 查詢日期設定" -ForegroundColor Yellow
+
+        # 取得上個月的範圍
+        $today = Get-Date
+        $lastMonth = $today.AddMonths(-1)
+        $startDate = Get-Date -Year $lastMonth.Year -Month $lastMonth.Month -Day 1
+        $endDate = $startDate.AddMonths(1).AddDays(-1)
+        $defaultStart = $startDate.ToString("yyyyMMdd")
+        $defaultEnd = $endDate.ToString("yyyyMMdd")
+
+        Write-Host "預設查詢範圍：$defaultStart - $defaultEnd (上個月)"
         Write-Host ""
 
-        $periodInput = Read-Host "期數"
+        $customDate = Read-Host "是否要自訂日期範圍？(y/N)"
 
-        if ($periodInput -and $periodInput -match '^\d+$' -and [int]$periodInput -gt 0) {
-            $args += "--period"
-            $args += $periodInput
-            Write-Host "✅ 將下載最新 $periodInput 期" -ForegroundColor Green
+        if ($customDate -eq 'y' -or $customDate -eq 'Y') {
+            $startInput = Read-Host "開始日期 (YYYYMMDD)"
+            $endInput = Read-Host "結束日期 (YYYYMMDD)"
+
+            if ($startInput -match '^\d{8}$') {
+                $args += "--start-date"
+                $args += $startInput
+            }
+            if ($endInput -match '^\d{8}$') {
+                $args += "--end-date"
+                $args += $endInput
+            }
+
+            Write-Host "✅ 將查詢日期範圍：$startInput - $endInput" -ForegroundColor Green
         } else {
-            Write-Host "✅ 使用預設值：下載最新 1 期" -ForegroundColor Green
+            Write-Host "✅ 使用預設範圍：$defaultStart - $defaultEnd" -ForegroundColor Green
         }
         Write-Host ""
     }
 
     # 顯示執行命令
-    $commandStr = "uv run python -u src/scrapers/payment_scraper.py"
+    $commandStr = "uv run python -u src/scrapers/freight_scraper.py"
     if ($args.Count -gt 0) {
         $commandStr += " " + ($args -join " ")
     }
@@ -63,7 +79,7 @@ try {
     Write-Host ""
 
     # 執行 Python 程式
-    & uv run python -u src/scrapers/payment_scraper.py @args
+    & uv run python -u src/scrapers/freight_scraper.py @args
 
     # 檢查執行結果
     Test-ExecutionResult -ExitCode $LASTEXITCODE
