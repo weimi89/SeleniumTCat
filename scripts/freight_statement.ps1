@@ -41,7 +41,11 @@ try {
         $today = Get-Date
         $lastMonth = $today.AddMonths(-1)
         $startDate = Get-Date -Year $lastMonth.Year -Month $lastMonth.Month -Day 1
-        $endDate = $startDate.AddMonths(1).AddDays(-1)
+
+        # 修正：直接取得上個月的最後一天
+        $firstDayThisMonth = Get-Date -Year $today.Year -Month $today.Month -Day 1
+        $endDate = $firstDayThisMonth.AddDays(-1)
+
         $defaultStart = $startDate.ToString("yyyyMMdd")
         $defaultEnd = $endDate.ToString("yyyyMMdd")
 
