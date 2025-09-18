@@ -37,14 +37,24 @@ try {
     if (-not ($args -contains "--start-date") -and -not ($args -contains "--end-date")) {
         Write-Host "📅 查詢日期設定" -ForegroundColor Yellow
 
-        # 取得上個月的範圍
+        # 取得上個月的範圍 - 使用最直接的計算方式
         $today = Get-Date
-        $lastMonth = $today.AddMonths(-1)
-        $startDate = Get-Date -Year $lastMonth.Year -Month $lastMonth.Month -Day 1
 
-        # 修正：直接取得上個月的最後一天
-        $firstDayThisMonth = Get-Date -Year $today.Year -Month $today.Month -Day 1
-        $endDate = $firstDayThisMonth.AddDays(-1)
+        # 計算上個月
+        if ($today.Month -eq 1) {
+            $lastMonthYear = $today.Year - 1
+            $lastMonthNum = 12
+        } else {
+            $lastMonthYear = $today.Year
+            $lastMonthNum = $today.Month - 1
+        }
+
+        # 上個月第一天
+        $startDate = Get-Date -Year $lastMonthYear -Month $lastMonthNum -Day 1
+
+        # 上個月最後一天（本月第一天減1天）
+        $thisMonthFirst = Get-Date -Year $today.Year -Month $today.Month -Day 1
+        $endDate = $thisMonthFirst.AddDays(-1)
 
         $defaultStart = $startDate.ToString("yyyyMMdd")
         $defaultEnd = $endDate.ToString("yyyyMMdd")
