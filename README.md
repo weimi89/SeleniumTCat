@@ -32,25 +32,25 @@ SeleniumTCat/
 │   │   └── unpaid_scraper.py     # 交易明細表工具
 │   └── utils/                    # 工具模組
 │       └── windows_encoding_utils.py  # Windows 相容性工具
-├── scripts/                      # 共用腳本
+├── scripts/                      # 共用腳本和 PowerShell 模組
 │   ├── common_checks.ps1         # PowerShell 共用檢查函數
 │   ├── common_checks.sh          # Shell 共用檢查函數
-│   └── common_checks.cmd         # CMD 共用檢查函數
-├── Linux_客樂得對帳單.sh          # Linux 貨到付款執行腳本
+│   ├── common_checks.cmd         # CMD 共用檢查函數
+│   ├── run_payment.ps1           # PowerShell 客樂得對帳單執行腳本
+│   ├── run_freight.ps1           # PowerShell 運費查詢執行腳本
+│   ├── run_unpaid.ps1            # PowerShell 交易明細表執行腳本
+│   ├── install.ps1               # PowerShell 自動安裝腳本
+│   └── update.ps1                # PowerShell 自動更新腳本
+├── Linux_客樂得對帳單.sh          # Linux 客樂得對帳單執行腳本
 ├── Linux_發票明細.sh             # Linux 運費查詢執行腳本
 ├── Linux_客戶交易明細.sh          # Linux 交易明細表執行腳本
 ├── Linux_安裝.sh                # Linux 自動安裝腳本
 ├── Linux_更新.sh                # Linux 自動更新腳本
-├── Windows_客樂得對帳單.cmd       # Windows 貨到付款執行腳本
+├── Windows_客樂得對帳單.cmd       # Windows 客樂得對帳單執行腳本
 ├── Windows_發票明細.cmd          # Windows 運費查詢執行腳本
 ├── Windows_客戶交易明細.cmd       # Windows 交易明細表執行腳本
 ├── Windows_安裝.cmd             # Windows 自動安裝腳本
 ├── Windows_更新.cmd             # Windows 自動更新腳本
-├── PowerShell_客樂得對帳單.ps1    # PowerShell 貨到付款執行腳本
-├── PowerShell_發票明細.ps1       # PowerShell 運費查詢執行腳本
-├── PowerShell_客戶交易明細.ps1    # PowerShell 交易明細表執行腳本
-├── PowerShell_安裝.ps1          # PowerShell 自動安裝腳本
-├── PowerShell_更新.ps1          # PowerShell 自動更新腳本
 ├── accounts.json                 # 帳號設定檔
 ├── accounts.json.example         # 帳號設定檔範例
 ├── pyproject.toml               # Python 專案設定
@@ -73,8 +73,6 @@ SeleniumTCat/
 # 雙擊執行或在命令提示字元中執行（自動啟動 PowerShell 7）
 Windows_更新.cmd
 
-# 或直接執行 PowerShell 7 腳本
-PowerShell_更新.ps1
 ```
 
 ### 更新功能特色
@@ -144,8 +142,6 @@ chmod +x Linux_安裝.sh && ./Linux_安裝.sh
 # 雙擊執行或在命令提示字元中執行（自動啟動 PowerShell 7）
 Windows_安裝.cmd
 
-# 或直接執行 PowerShell 7 腳本
-PowerShell_安裝.ps1
 ```
 
 安裝腳本會自動：
@@ -194,8 +190,6 @@ cp .env.example .env
 # Windows（自動啟動 PowerShell 7）
 Windows_客樂得對帳單.cmd
 
-# 或直接使用 PowerShell 7 腳本
-PowerShell_客樂得對帳單.ps1
 
 # 指定下載期數
 ./Linux_客樂得對帳單.sh --period 3      # Linux/macOS
@@ -227,9 +221,6 @@ uv run python -u src\scrapers\payment_scraper.py
 # Windows（自動啟動 PowerShell 7）
 Windows_發票明細.cmd
 
-# 或直接使用 PowerShell 7 腳本
-PowerShell_發票明細.ps1
-
 # 指定日期範圍
 ./Linux_發票明細.sh --start-date 20241201 --end-date 20241208   # Linux/macOS
 Windows_發票明細.cmd --start-date 20241201 --end-date 20241208    # Windows
@@ -260,8 +251,6 @@ uv run python -u src\scrapers\freight_scraper.py
 # Windows（自動啟動 PowerShell 7）
 Windows_客戶交易明細.cmd
 
-# 或直接使用 PowerShell 7 腳本
-PowerShell_客戶交易明細.ps1
 
 # 指定週期數量
 ./Linux_客戶交易明細.sh --periods 3      # Linux/macOS

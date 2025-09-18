@@ -994,6 +994,9 @@ class FreightScraper(BaseScraper):
         """執行完整的運費查詢自動化流程"""
         downloaded_files = []
 
+        # 開始執行時間計時
+        self.start_execution_timer()
+
         try:
             print("=" * 60)
             safe_print(f"🚛 開始執行黑貓宅急便運費查詢流程 (帳號: {self.username})")
@@ -1068,6 +1071,8 @@ class FreightScraper(BaseScraper):
                 "downloads": [str(f) for f in downloaded_files]
             }
         finally:
+            # 結束執行時間計時
+            self.end_execution_timer()
             self.close()
 
 
