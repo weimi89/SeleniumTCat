@@ -65,6 +65,11 @@ try {
 
             Write-Host "✅ 將查詢日期範圍：$startInput - $endInput" -ForegroundColor Green
         } else {
+            # 使用預設範圍，將預設日期加入參數
+            $args += "--start-date"
+            $args += $defaultStart
+            $args += "--end-date"
+            $args += $defaultEnd
             Write-Host "✅ 使用預設範圍：$defaultStart - $defaultEnd" -ForegroundColor Green
         }
         Write-Host ""
