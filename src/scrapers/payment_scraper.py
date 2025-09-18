@@ -1201,7 +1201,17 @@ class PaymentScraper(BaseScraper):
 
                     except Exception as rename_e:
                         print(f"   ⚠️ 檔案重新命名失敗: {rename_e}")
-                        return [latest_file]
+                        # 即使重命名失敗，也要確保檔案有唯一名稱
+                        try:
+                            import uuid
+                            backup_filename = f"客樂得對帳單_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
+                            backup_file_path = self.download_dir / backup_filename
+                            latest_file.rename(backup_file_path)
+                            print(f"   🔄 使用備用檔案名: {backup_filename}")
+                            return [backup_file_path]
+                        except Exception as backup_e:
+                            print(f"   ❌ 備用重命名也失敗: {backup_e}")
+                            return [latest_file]
 
                 return []
             else:
