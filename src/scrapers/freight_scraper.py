@@ -760,6 +760,13 @@ class FreightScraper(BaseScraper):
         try:
             # 首先解析表格資料以獲取發票資訊
             invoice_data = self._parse_invoice_table()
+            
+            # 如果沒有發票資料，直接返回，不執行下載
+            if not invoice_data:
+                safe_print("⚠️ 沒有找到發票資料，跳過下載")
+                return []
+            
+            safe_print(f"✅ 找到 {len(invoice_data)} 筆發票資料，準備下載")
 
             # 記錄下載前的檔案
             files_before = set(self.download_dir.glob("*"))
