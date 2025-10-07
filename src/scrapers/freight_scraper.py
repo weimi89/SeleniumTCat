@@ -751,7 +751,7 @@ class FreightScraper(BaseScraper):
             return False
 
     def _download_results(self):
-        """下載搜尋結果"""
+        """下載搜尋結果 - 修正版：先點擊發票編號進入詳細頁面"""
         safe_print("📥 開始下載搜尋結果...")
         
         # 設定本次下載的 UUID 臨時目錄
@@ -766,83 +766,49 @@ class FreightScraper(BaseScraper):
                 safe_print("⚠️ 沒有找到發票資料，跳過下載")
                 return []
             
-            safe_print(f"✅ 找到 {len(invoice_data)} 筆發票資料，準備下載")
+            safe_print(f"✅ 找到 {len(invoice_data)} 筆發票資料，準備進入詳細頁面下載")
 
-            # 記錄下載前的檔案
-            files_before = set(self.download_dir.glob("*"))
+            all_downloaded_files = []
 
-            # 使用確切的 btnDownload ID（基於用戶提供的 HTML）
-            download_button = None
-            try:
-                download_button = self.driver.find_element(By.ID, "btnDownload")
-                if download_button and download_button.is_displayed() and download_button.is_enabled():
-                    safe_print("✅ 找到下載按鈕: btnDownload (ID)")
-                else:
-                    safe_print("⚠️ btnDownload 按鈕存在但不可用")
-                    return []
-            except Exception as e:
-                safe_print(f"❌ 找不到 btnDownload 按鈕: {e}")
-
-                # 備用方法：尋找明細下載按鈕
-                backup_selectors = [
-                    ("NAME", "btnDownload"),
-                    ("VALUE", "明細下載"),
-                    ("CSS", "input[type='submit'][value='明細下載']")
-                ]
-
-                for method, selector in backup_selectors:
-                    try:
-                        if method == "NAME":
-                            download_button = self.driver.find_element(By.NAME, selector)
-                        elif method == "VALUE":
-                            download_button = self.driver.find_element(By.CSS_SELECTOR, f"input[value='{selector}']")
-                        elif method == "CSS":
-                            download_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-
-                        if download_button and download_button.is_displayed() and download_button.is_enabled():
-                            safe_print(f"✅ 找到備用下載按鈕: {method}={selector}")
-                            break
-
-                    except Exception:
+            # 對每一筆發票資料進行處理
+            for idx, invoice_info in enumerate(invoice_data, 1):
+                safe_print(f"📄 處理第 {idx}/{len(invoice_data)} 筆發票: {invoice_info['invoice_number']}")
+                
+                try:
+                    # 步驟 1: 點擊發票編號進入詳細頁面
+                    detail_page_success = self._click_invoice_number(invoice_info['invoice_number'])
+                    if not detail_page_success:
+                        safe_print(f"⚠️ 無法進入發票 {invoice_info['invoice_number']} 的詳細頁面，跳過")
                         continue
 
-            if not download_button:
-                safe_print("❌ 找不到任何下載按鈕，可能沒有資料可下載")
-                return []
+                    # 步驟 2: 等待詳細頁面載入
+                    time.sleep(3)
 
-            # 點擊下載按鈕
-            safe_print("🖱️ 點擊明細下載按鈕...")
+                    # 步驟 3: 在詳細頁面點擊下載表格按鈕
+                    downloaded_file = self._download_invoice_detail(invoice_info)
+                    
+                    if downloaded_file:
+                        all_downloaded_files.extend(downloaded_file)
+                        safe_print(f"✅ 成功下載發票 {invoice_info['invoice_number']}")
+                    else:
+                        safe_print(f"⚠️ 發票 {invoice_info['invoice_number']} 下載失敗")
 
-            # 處理可能的確認對話框
-            try:
-                self.driver.execute_script("arguments[0].click();", download_button)
+                    # 步驟 4: 返回列表頁面
+                    self._return_to_list_page()
+                    time.sleep(2)
 
-                # 檢查是否有確認對話框
-                time.sleep(1)
-                try:
-                    alert = self.driver.switch_to.alert
-                    alert_text = alert.text
-                    safe_print(f"🔔 發現確認對話框: {alert_text}")
-                    alert.accept()
-                    safe_print("✅ 已確認下載")
-                except Exception:
-                    pass  # 沒有對話框
+                except Exception as e:
+                    safe_print(f"❌ 處理發票 {invoice_info['invoice_number']} 時發生錯誤: {e}")
+                    # 嘗試返回列表頁面
+                    try:
+                        self._return_to_list_page()
+                    except:
+                        pass
+                    continue
 
-            except Exception as e:
-                safe_print(f"❌ 點擊下載按鈕失敗: {e}")
-                return []
-
-            # 等待檔案下載
-            safe_print("⏳ 等待檔案下載...")
-            downloaded_files = self._wait_for_download(files_before)
-
-            if downloaded_files:
-                # 重命名檔案（格式：{帳號}_{發票日期}_{發票號碼}）
-                renamed_files = self._rename_downloaded_files_with_invoice_info(downloaded_files, invoice_data)
-                # 使用新的檔案移動機制
-                final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
-                safe_print(f"✅ 成功下載並重命名 {len(final_files)} 個檔案")
-                return final_files
+            if all_downloaded_files:
+                safe_print(f"✅ 成功下載並重命名 {len(all_downloaded_files)} 個檔案")
+                return all_downloaded_files
             else:
                 safe_print("⚠️ 沒有檢測到新的下載檔案")
                 return []
@@ -850,6 +816,161 @@ class FreightScraper(BaseScraper):
         except Exception as e:
             safe_print(f"❌ 下載失敗: {e}")
             return []
+
+    def _click_invoice_number(self, invoice_number):
+        """點擊發票編號進入詳細頁面"""
+        safe_print(f"🖱️ 點擊發票編號: {invoice_number}")
+        
+        try:
+            # 在表格中尋找對應的發票編號連結
+            table = self.driver.find_element(By.ID, "grdList")
+            rows = table.find_elements(By.TAG_NAME, "tr")
+            
+            for row in rows[1:]:  # 跳過標題行
+                try:
+                    cells = row.find_elements(By.TAG_NAME, "td")
+                    if len(cells) >= 3:
+                        # 檢查發票編號欄位（第3欄）
+                        invoice_cell = cells[3]
+                        
+                        # 尋找連結
+                        try:
+                            invoice_link = invoice_cell.find_element(By.TAG_NAME, "a")
+                            link_text = invoice_link.text.strip()
+                            
+                            if link_text == invoice_number:
+                                safe_print(f"✅ 找到發票編號連結: {invoice_number}")
+                                # 使用 JavaScript 點擊以避免元素被遮擋
+                                self.driver.execute_script("arguments[0].click();", invoice_link)
+                                return True
+                        except:
+                            continue
+                            
+                except Exception as e:
+                    continue
+            
+            safe_print(f"❌ 找不到發票編號 {invoice_number} 的連結")
+            return False
+            
+        except Exception as e:
+            safe_print(f"❌ 點擊發票編號失敗: {e}")
+            return False
+
+    def _download_invoice_detail(self, invoice_info):
+        """在詳細頁面下載發票表格"""
+        safe_print("📥 在詳細頁面下載發票表格...")
+        
+        try:
+            # 記錄下載前的檔案
+            files_before = set(self.download_dir.glob("*"))
+            
+            # 尋找 lnkbtnDownloadInvoice 下載按鈕
+            download_button = None
+            
+            try:
+                # 方法 1: 直接使用 ID
+                download_button = self.driver.find_element(By.ID, "lnkbtnDownloadInvoice")
+                if download_button and download_button.is_displayed():
+                    safe_print("✅ 找到下載表格按鈕: lnkbtnDownloadInvoice")
+                else:
+                    safe_print("⚠️ lnkbtnDownloadInvoice 按鈕不可見")
+                    download_button = None
+                    
+            except Exception as e:
+                safe_print(f"⚠️ 找不到 lnkbtnDownloadInvoice: {e}")
+                
+                # 方法 2: 使用文字內容尋找
+                try:
+                    links = self.driver.find_elements(By.TAG_NAME, "a")
+                    for link in links:
+                        if "下載表格" in link.text:
+                            download_button = link
+                            safe_print("✅ 透過文字找到下載表格按鈕")
+                            break
+                except:
+                    pass
+            
+            if not download_button:
+                safe_print("❌ 找不到下載表格按鈕")
+                return []
+            
+            # 點擊下載按鈕
+            safe_print("🖱️ 點擊下載表格按鈕...")
+            
+            try:
+                # 如果是 JavaScript 連結，需要執行 JavaScript
+                href = download_button.get_attribute('href')
+                if href and 'javascript:' in href:
+                    # 提取 __doPostBack 參數並執行
+                    self.driver.execute_script("arguments[0].click();", download_button)
+                else:
+                    download_button.click()
+                
+                safe_print("✅ 已點擊下載表格按鈕")
+                
+                # 檢查是否有確認對話框
+                time.sleep(1)
+                try:
+                    alert = self.driver.switch_to.alert
+                    alert_text = alert.text
+                    safe_print(f"🔔 發現確認對話框: {alert_text}")
+                    alert.accept()
+                except:
+                    pass
+                
+            except Exception as e:
+                safe_print(f"❌ 點擊下載按鈕失敗: {e}")
+                return []
+            
+            # 等待檔案下載
+            safe_print("⏳ 等待檔案下載...")
+            downloaded_files = self._wait_for_download(files_before)
+            
+            if downloaded_files:
+                # 重命名檔案
+                renamed_files = self._rename_downloaded_files_with_invoice_info(downloaded_files, [invoice_info])
+                # 使用新的檔案移動機制
+                final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
+                safe_print(f"✅ 成功下載並重命名檔案")
+                return final_files
+            else:
+                safe_print("⚠️ 沒有檢測到新的下載檔案")
+                return []
+                
+        except Exception as e:
+            safe_print(f"❌ 下載發票詳細頁面失敗: {e}")
+            return []
+
+    def _return_to_list_page(self):
+        """返回發票列表頁面"""
+        safe_print("🔙 返回發票列表頁面...")
+        
+        try:
+            # 方法 1: 使用瀏覽器的返回按鈕
+            self.driver.back()
+            time.sleep(2)
+            safe_print("✅ 已返回列表頁面")
+            return True
+            
+        except Exception as e:
+            safe_print(f"⚠️ 返回列表頁面失敗: {e}")
+            
+            # 方法 2: 重新導航到對帳單明細頁面
+            try:
+                safe_print("🔄 嘗試重新導航到對帳單明細頁面...")
+                nav_success = self.navigate_to_freight_query()
+                if nav_success:
+                    # 重新設定日期並搜尋
+                    self.set_invoice_date_range()
+                    time.sleep(1)
+                    self._click_search_button()
+                    time.sleep(3)
+                    safe_print("✅ 重新導航並搜尋成功")
+                    return True
+            except Exception as nav_e:
+                safe_print(f"❌ 重新導航失敗: {nav_e}")
+            
+            return False
 
     def _wait_for_download(self, files_before, timeout=60):
         """等待檔案下載完成"""
