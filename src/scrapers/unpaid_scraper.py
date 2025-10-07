@@ -51,12 +51,12 @@ class UnpaidScraper(BaseScraper):
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
-                time.sleep(3)  # 間隔時間
+                time.sleep(1)  # 短暫間隔
 
             try:
-                # 等待登入完成
+                # 智慧等待登入完成
                 safe_print("⏳ 等待登入完成...")
-                time.sleep(5)
+                self.smart_wait_for_url_change(timeout=10)
 
                 # 檢查當前會話狀態
                 if self._check_session_timeout():
@@ -111,13 +111,13 @@ class UnpaidScraper(BaseScraper):
                         # 回到合約客戶專區首頁
                         home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
                         self.driver.get(home_url)
-                        time.sleep(3)
+                        self.smart_wait_for_url_change(timeout=5)
 
                         # 檢查是否需要重新登入
                         if 'Login.aspx' in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
                             self.login()
-                            time.sleep(3)
+                            self.smart_wait_for_url_change(timeout=10)
                     except Exception as reset_e:
                         safe_print(f"❌ 重置會話失敗: {reset_e}")
 
@@ -155,7 +155,7 @@ class UnpaidScraper(BaseScraper):
 
                     try:
                         self.driver.get(full_url)
-                        time.sleep(2)  # 短暫等待以檢測 alert
+                        time.sleep(1)  # 短暫等待以檢測 alert
 
                         # 處理可能的 alert 彈窗
                         alert_result = self._handle_alerts()
@@ -165,7 +165,7 @@ class UnpaidScraper(BaseScraper):
                         elif alert_result:
                             print("   🔔 處理了安全提示或其他彈窗")
 
-                        time.sleep(3)  # 等待頁面完全載入
+                        self.smart_wait(1)  # 等待頁面穩定
 
                         current_url = self.driver.current_url
                         print(f"   導航後 URL: {current_url}")
@@ -177,7 +177,7 @@ class UnpaidScraper(BaseScraper):
                                 print("   ✅ 重新登入成功，重試導航...")
                                 # 重新嘗試當前 URL
                                 self.driver.get(full_url)
-                                time.sleep(3)
+                                self.smart_wait(1)
                                 current_url = self.driver.current_url
                             else:
                                 print("   ❌ 重新登入失敗")
@@ -192,7 +192,7 @@ class UnpaidScraper(BaseScraper):
 
                         # 如果這次嘗試失敗，但還有重試機會，則稍等片刻再重試
                         if retry < max_retries:
-                            time.sleep(2)
+                            time.sleep(1)
                         else:
                             break  # 跳出重試循環，嘗試下一個 URL
 
@@ -238,7 +238,7 @@ class UnpaidScraper(BaseScraper):
                 self.driver.switch_to.default_content()
                 return False
 
-            time.sleep(3)  # 等待選單展開
+            self.smart_wait(2)  # 等待選單展開
 
             # 步驟2: 尋找並點擊「交易明細表」
             transaction_success = self._click_transaction_detail_menu()
@@ -247,8 +247,8 @@ class UnpaidScraper(BaseScraper):
                 self.driver.switch_to.default_content()
                 return False
 
-            # 等待頁面載入
-            time.sleep(5)
+            # 智慧等待頁面載入
+            self.smart_wait(2)
 
             self.driver.switch_to.default_content()
             return self._is_transaction_detail_page()
@@ -461,7 +461,7 @@ class UnpaidScraper(BaseScraper):
                 try:
                     print(f"   嘗試登入 URL: {login_url}")
                     self.driver.get(login_url)
-                    time.sleep(3)
+                    self.smart_wait_for_url_change(timeout=5)
 
                     current_url = self.driver.current_url
                     print(f"   導航後 URL: {current_url}")
@@ -475,8 +475,8 @@ class UnpaidScraper(BaseScraper):
                         if login_success:
                             safe_print("✅ 會話超時後重新登入成功")
 
-                            # 等待登入完成並驗證
-                            time.sleep(5)
+                            # 智慧等待登入完成並驗證
+                            self.smart_wait_for_url_change(timeout=10)
 
                             # 驗證登入是否真的成功
                             if not self._check_session_timeout():
@@ -507,8 +507,9 @@ class UnpaidScraper(BaseScraper):
                     self.driver.delete_all_cookies()
 
                     # 回到首頁
+                    old_url = self.driver.current_url
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
-                    time.sleep(3)
+                    self.smart_wait_for_url_change(old_url, timeout=5)
 
                     # 再次嘗試登入
                     final_login_success = self.login()
@@ -616,10 +617,10 @@ class UnpaidScraper(BaseScraper):
                 else:
                     safe_print(f"⚠️ 第 {period} 期下載失敗: {period_result.get('error', '未知錯誤')}")
 
-                # 週期間等待（頁面重新整理後減少等待時間）
+                # 週期間等待
                 if period < self.periods:
-                    safe_print(f"⏳ 等待 3 秒後處理下一期...")
-                    time.sleep(3)
+                    safe_print(f"⏳ 等待 2 秒後處理下一期...")
+                    time.sleep(2)
 
             return downloaded_files, period_details
 
@@ -634,10 +635,11 @@ class UnpaidScraper(BaseScraper):
 
             # 直接導航到交易明細表完整URL
             transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
+            old_url = self.driver.current_url
             self.driver.get(transaction_url)
 
-            # 等待頁面載入
-            time.sleep(5)
+            # 智慧等待頁面載入
+            self.smart_wait_for_url_change(old_url, timeout=5)
 
             safe_print("✅ 成功導航到交易明細表頁面")
             return True
@@ -655,7 +657,7 @@ class UnpaidScraper(BaseScraper):
     def _download_period_data_with_details(self, period, max_retries=3):
         """下載特定週期的資料並返回詳細信息，支援重試機制"""
         safe_print(f"📥 下載第 {period} 期資料...")
-        
+
         # 設定本次下載的 UUID 臨時目錄
         self.setup_temp_download_dir()
 
@@ -679,8 +681,9 @@ class UnpaidScraper(BaseScraper):
                     safe_print(f"🔄 第 {period} 期第 {retry + 1} 次重試...")
                     # 重新載入頁面
                     transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
+                    old_url = self.driver.current_url
                     self.driver.get(transaction_url)
-                    time.sleep(5)
+                    self.smart_wait_for_url_change(old_url, timeout=5)
 
                 # 記錄下載前的檔案
                 files_before = set(self.download_dir.glob("*"))
@@ -774,8 +777,9 @@ class UnpaidScraper(BaseScraper):
                     safe_print(f"🔄 第 {period} 期第 {retry + 1} 次重試...")
                     # 重新載入頁面
                     transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
+                    old_url = self.driver.current_url
                     self.driver.get(transaction_url)
-                    time.sleep(5)
+                    self.smart_wait_for_url_change(old_url, timeout=5)
 
                 # 記錄下載前的檔案
                 files_before = set(self.download_dir.glob("*"))
@@ -968,43 +972,44 @@ class UnpaidScraper(BaseScraper):
             return False
 
     def _wait_for_search_results(self, timeout=30):
-        """等待搜尋結果載入"""
+        """等待搜尋結果載入 - 使用智慧等待"""
         safe_print("⏳ 等待搜尋結果載入...")
 
-        for i in range(timeout):
-            try:
-                # 檢查多種可能的下載按鈕 ID
-                download_button_ids = ["lnkbtnDownload", "btnDownload", "lnkDownload"]
-                download_button_found = False
+        try:
+            # 嘗試多種可能的下載按鈕 ID
+            download_button_ids = ["lnkbtnDownload", "btnDownload", "lnkDownload"]
 
-                for button_id in download_button_ids:
-                    try:
-                        download_button = self.driver.find_element(By.ID, button_id)
-                        if download_button and download_button.is_displayed() and download_button.is_enabled():
-                            safe_print(f"✅ 搜尋結果載入完成，下載按鈕已準備就緒: {button_id} ({i+1} 秒)")
-                            return True
-                    except:
-                        continue
+            for button_id in download_button_ids:
+                download_button = self.smart_wait_for_element(
+                    By.ID,
+                    button_id,
+                    timeout=timeout // len(download_button_ids),
+                    visible=True
+                )
 
-                # 如果沒找到特定 ID，嘗試搜尋下載相關的連結或按鈕
-                try:
-                    download_elements = self.driver.find_elements(By.XPATH, "//*[contains(text(), '下載') or contains(text(), '明細下載') or contains(text(), '交易明細下載')]")
-                    for element in download_elements:
-                        if element.is_displayed() and element.is_enabled():
-                            safe_print(f"✅ 搜尋結果載入完成，找到下載元素 ({i+1} 秒)")
-                            return True
-                except:
-                    pass
+                if download_button:
+                    safe_print(f"✅ 搜尋結果載入完成，下載按鈕已準備就緒: {button_id}")
+                    return True
 
-            except Exception:
-                pass
+            # 如果沒找到特定 ID，嘗試 XPath 搜尋
+            safe_print("⚠️ 嘗試使用 XPath 搜尋下載元素...")
+            download_element = self.smart_wait_for_element(
+                By.XPATH,
+                "//*[contains(text(), '下載') or contains(text(), '明細下載') or contains(text(), '交易明細下載')]",
+                timeout=10,
+                visible=True
+            )
 
-            time.sleep(1)
-            if (i + 1) % 5 == 0:  # 每5秒報告一次
-                safe_print(f"   等待搜尋結果中... ({i+1}/{timeout} 秒)")
+            if download_element:
+                safe_print("✅ 搜尋結果載入完成，找到下載元素")
+                return True
 
-        safe_print("⚠️ 搜尋結果載入超時，可能沒有符合條件的資料")
-        return False
+            safe_print("⚠️ 搜尋結果載入超時，可能沒有符合條件的資料")
+            return False
+
+        except Exception as e:
+            safe_print(f"⚠️ 搜尋結果載入失敗: {e}")
+            return False
 
     def _click_download_button(self, max_retries=3):
         """點擊交易明細下載按鈕，支援重試機制"""
@@ -1014,7 +1019,7 @@ class UnpaidScraper(BaseScraper):
             try:
                 if retry > 0:
                     safe_print(f"🔄 第 {retry + 1} 次重試點擊下載按鈕...")
-                    time.sleep(2)  # 等待頁面穩定
+                    self.smart_wait(1)  # 等待頁面穩定
 
                 download_button = None
 
@@ -1078,7 +1083,7 @@ class UnpaidScraper(BaseScraper):
                 self.driver.execute_script("arguments[0].click();", download_button)
 
                 # 處理可能的確認對話框
-                time.sleep(1)
+                self.smart_wait(0.5)
                 try:
                     alert = self.driver.switch_to.alert
                     alert_text = alert.text
@@ -1175,30 +1180,22 @@ class UnpaidScraper(BaseScraper):
             return True
 
     def _wait_for_download(self, files_before, timeout=30):
-        """等待檔案下載完成"""
+        """等待檔案下載完成 - 使用智慧等待"""
         safe_print(f"⏳ 等待檔案下載完成（最多 {timeout} 秒）...")
 
-        for i in range(timeout):
-            time.sleep(1)
-            files_after = set(self.download_dir.glob("*"))
-            new_files = files_after - files_before
+        # 使用智慧檔案下載等待
+        downloaded_files = self.smart_wait_for_file_download(
+            expected_extension='.xlsx',
+            timeout=timeout,
+            check_interval=0.5
+        )
 
-            if new_files:
-                # 檢查檔案是否下載完成（不是 .crdownload 或 .tmp）
-                completed_files = []
-                for file_path in new_files:
-                    if not str(file_path).endswith(('.crdownload', '.tmp', '.part')):
-                        completed_files.append(file_path)
+        if downloaded_files:
+            safe_print(f"✅ 檔案下載完成: {len(downloaded_files)} 個檔案")
+        else:
+            safe_print("⚠️ 檔案下載超時")
 
-                if completed_files:
-                    safe_print(f"✅ 檔案下載完成: {len(completed_files)} 個檔案")
-                    return completed_files
-
-            if i % 10 == 0:
-                safe_print(f"   等待中... ({i}/{timeout} 秒)")
-
-        safe_print("⚠️ 檔案下載超時")
-        return []
+        return downloaded_files
 
     def _rename_period_files(self, downloaded_files, start_date, end_date):
         """重命名下載的檔案（格式：{帳號}_{開始日期}-{結束日期}）"""

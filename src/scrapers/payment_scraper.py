@@ -58,9 +58,9 @@ class PaymentScraper(BaseScraper):
                 time.sleep(3)  # 間隔時間
 
             try:
-                # 等待登入完成
+                # 智慧等待登入完成 - URL 不再是 Login.aspx
                 print("⏳ 等待登入完成...")
-                time.sleep(5)
+                self.smart_wait_for_url_change(old_url=self.url, timeout=10)
 
                 # 檢查當前會話狀態
                 if self._check_session_timeout():
@@ -271,7 +271,8 @@ class PaymentScraper(BaseScraper):
 
             # 步驟2: 尋找並點擊貨到付款匯款明細表
             print("💰 步驟2: 尋找貨到付款匯款明細表...")
-            time.sleep(3)  # 等待選單載入
+            # 智慧等待選單載入
+            self.smart_wait_for_element(By.TAG_NAME, "a", timeout=5)  # 等待選單載入
             payment_success = self._click_payment_option()
 
             self.driver.switch_to.default_content()
@@ -403,8 +404,10 @@ class PaymentScraper(BaseScraper):
                     if "貨到付款匯款明細表" in link_text or "貨到付款" in link_text:
                         if link.is_displayed() and link.is_enabled():
                             print(f"   找到通用連結: '{link_text.strip()}'")
+                            old_url = self.driver.current_url
                             link.click()
-                            time.sleep(5)
+                            # 智慧等待頁面載入
+                            self.smart_wait_for_url_change(old_url, timeout=10)
 
                             current_url = self.driver.current_url
                             print(f"   📍 點擊後 URL: {current_url}")
@@ -902,7 +905,7 @@ class PaymentScraper(BaseScraper):
     def download_cod_statement(self):
         """下載貨到付款匯款明細表"""
         safe_print("📥 開始下載貨到付款匯款明細表...")
-        
+
         # 設定本次下載的 UUID 臨時目錄
         self.setup_temp_download_dir()
 
@@ -997,7 +1000,8 @@ class PaymentScraper(BaseScraper):
                         # 使用 JavaScript 點擊以確保成功
                         self.driver.execute_script("arguments[0].click();", btn_info['element'])
                         print("   ✅ 搜尋按鈕已點擊，等待 AJAX 載入...")
-                        time.sleep(10)  # 等待 AJAX 完成載入
+                        # 智慧等待 AJAX 完成
+                        self.smart_wait_for_ajax(timeout=15)  # 等待 AJAX 完成載入
                         query_executed = True
                         break
                     except Exception as click_e:
@@ -1011,7 +1015,8 @@ class PaymentScraper(BaseScraper):
                         print(f"   點擊查詢按鈕: '{btn_info['text']}'")
                         self.driver.execute_script("arguments[0].click();", btn_info['element'])
                         print("   ✅ 查詢按鈕已點擊，等待 AJAX 載入...")
-                        time.sleep(10)
+                        # 智慧等待 AJAX 完成
+                        self.smart_wait_for_ajax(timeout=15)
                         query_executed = True
                         break
                     except Exception as click_e:
@@ -1150,29 +1155,19 @@ class PaymentScraper(BaseScraper):
                         except Exception as dialog_e:
                             pass  # 忽略對話框處理錯誤
 
-                        # 等待下載完成
-                        max_wait_time = 30  # 最多等待30秒
-                        downloaded_files = []
-                        for wait_time in range(max_wait_time):
-                            time.sleep(1)
-                            files_after = set(self.download_dir.glob("*"))
-                            new_files = files_after - files_before
+                        # 智慧等待下載完成
+                        print("   ⏳ 等待檔案下載...")
+                        downloaded_files = self.smart_wait_for_file_download(
+                            expected_extension='.xlsx',
+                            timeout=30,
+                            check_interval=0.5
+                        )
 
-                            if new_files:
-                                for new_file in new_files:
-                                    if new_file.suffix.lower() in ['.xls', '.xlsx', '.csv']:
-                                        print(f"   🎉 下載成功: {new_file.name}")
-                                        downloaded_files.append(new_file)
-                                        download_success = True
-                                        break
-
-                            if download_success:
-                                break
-
-                        if download_success:
+                        if downloaded_files:
+                            download_success = True
                             break
                         else:
-                            print(f"   ⚠️ 按鈕 {i+1} 點擊後 {max_wait_time} 秒內未檢測到新檔案")
+                            print(f"   ⚠️ 按鈕 {i+1} 點擊後未檢測到新檔案")
 
                     except Exception as click_e:
                         print(f"   ❌ 下載按鈕 {i+1} 點擊失敗: {click_e}")

@@ -71,12 +71,12 @@ class FreightScraper(BaseScraper):
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
-                time.sleep(3)  # 間隔時間
+                time.sleep(1)  # 短暫間隔
 
             try:
-                # 等待登入完成
+                # 智慧等待登入完成
                 safe_print("⏳ 等待登入完成...")
-                time.sleep(5)
+                self.smart_wait_for_url_change(timeout=10)
 
                 # 檢查當前會話狀態
                 if self._check_session_timeout():
@@ -131,13 +131,13 @@ class FreightScraper(BaseScraper):
                         # 回到合約客戶專區首頁
                         home_url = "https://www.takkyubin.com.tw/YMTContract/default.aspx"
                         self.driver.get(home_url)
-                        time.sleep(3)
+                        self.smart_wait_for_url_change(timeout=5)
 
                         # 檢查是否需要重新登入
                         if 'Login.aspx' in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
                             self.login()
-                            time.sleep(3)
+                            self.smart_wait_for_url_change(timeout=10)
                     except Exception as reset_e:
                         safe_print(f"❌ 重置會話失敗: {reset_e}")
 
@@ -175,7 +175,7 @@ class FreightScraper(BaseScraper):
 
                     try:
                         self.driver.get(full_url)
-                        time.sleep(2)  # 短暫等待以檢測 alert
+                        time.sleep(1)  # 短暫等待以檢測 alert
 
                         # 處理可能的 alert 彈窗
                         alert_result = self._handle_alerts()
@@ -197,11 +197,12 @@ class FreightScraper(BaseScraper):
                                 print("   ✅ 重新登入成功，重試導航...")
                                 # 重新嘗試當前 URL
                                 self.driver.get(full_url)
-                                time.sleep(3)
-                                current_url = self.driver.current_url
+                                self.smart_wait(1)  # 等待頁面穩定
                             else:
                                 print("   ❌ 重新登入失敗")
                                 continue
+
+                        current_url = self.driver.current_url
 
                         # 檢查是否成功到達對帳單明細頁面
                         if self._is_freight_page():
@@ -258,7 +259,7 @@ class FreightScraper(BaseScraper):
                 self.driver.switch_to.default_content()
                 return False
 
-            time.sleep(3)  # 等待選單展開
+            self.smart_wait(2)  # 等待選單展開
 
             # 步驟2: 尋找並點擊「對帳單明細」
             statement_success = self._click_statement_detail_menu()
@@ -267,8 +268,8 @@ class FreightScraper(BaseScraper):
                 self.driver.switch_to.default_content()
                 return False
 
-            # 等待頁面載入
-            time.sleep(5)
+            # 智慧等待頁面載入
+            self.smart_wait(2)
 
             self.driver.switch_to.default_content()
             return self._is_freight_page()
@@ -484,7 +485,7 @@ class FreightScraper(BaseScraper):
                 try:
                     print(f"   嘗試登入 URL: {login_url}")
                     self.driver.get(login_url)
-                    time.sleep(3)
+                    self.smart_wait_for_url_change(timeout=5)
 
                     current_url = self.driver.current_url
                     print(f"   導航後 URL: {current_url}")
@@ -498,8 +499,8 @@ class FreightScraper(BaseScraper):
                         if login_success:
                             safe_print("✅ 會話超時後重新登入成功")
 
-                            # 等待登入完成並驗證
-                            time.sleep(5)
+                            # 智慧等待登入完成並驗證
+                            self.smart_wait_for_url_change(timeout=10)
 
                             # 驗證登入是否真的成功
                             if not self._check_session_timeout():
@@ -530,10 +531,11 @@ class FreightScraper(BaseScraper):
                     self.driver.delete_all_cookies()
 
                     # 回到首頁
+                    old_url = self.driver.current_url
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
-                    time.sleep(3)
+                    self.smart_wait_for_url_change(old_url, timeout=5)
 
-                    # 再次嘗試登入
+                    # 再次嘗試登入並智慧等待
                     final_login_success = self.login()
                     if final_login_success:
                         safe_print("✅ 重新初始化後登入成功")
@@ -675,23 +677,25 @@ class FreightScraper(BaseScraper):
         """等待 AJAX 搜尋結果載入並檢查下載按鈕是否出現"""
         safe_print("⏳ 等待 AJAX 搜尋結果載入...")
 
-        for i in range(timeout):
-            try:
-                # 檢查下載按鈕是否出現且可用
-                download_button = self.driver.find_element(By.ID, "btnDownload")
-                if download_button and download_button.is_displayed() and download_button.is_enabled():
-                    safe_print(f"✅ AJAX 載入完成，下載按鈕已準備就緒 ({i+1} 秒)")
-                    return True
+        try:
+            # 使用智慧等待檢查下載按鈕
+            download_button = self.smart_wait_for_element(
+                By.ID,
+                "btnDownload",
+                timeout=timeout,
+                visible=True
+            )
 
-            except Exception:
-                pass
+            if download_button:
+                safe_print("✅ AJAX 載入完成，下載按鈕已準備就緒")
+                return True
+            else:
+                safe_print("⚠️ AJAX 結果載入超時，可能沒有符合條件的資料")
+                return False
 
-            time.sleep(1)
-            if (i + 1) % 5 == 0:  # 每5秒報告一次
-                safe_print(f"   等待 AJAX 結果中... ({i+1}/{timeout} 秒)")
-
-        safe_print("⚠️ AJAX 結果載入超時，可能沒有符合條件的資料")
-        return False
+        except Exception as e:
+            safe_print(f"⚠️ AJAX 結果載入失敗: {e}")
+            return False
 
     def _click_search_button(self):
         """點擊搜尋按鈕並處理 AJAX 請求"""
@@ -742,8 +746,8 @@ class FreightScraper(BaseScraper):
             self.driver.execute_script("arguments[0].click();", search_button)
             safe_print("✅ 已點擊搜尋按鈕，AJAX 請求已發送")
 
-            # 短暫等待讓 AJAX 開始
-            time.sleep(1)
+            # 智慧等待 AJAX 開始
+            self.smart_wait_for_ajax(timeout=15)
             return True
 
         except Exception as e:
@@ -753,19 +757,19 @@ class FreightScraper(BaseScraper):
     def _download_results(self):
         """下載搜尋結果 - 修正版：先點擊發票編號進入詳細頁面"""
         safe_print("📥 開始下載搜尋結果...")
-        
+
         # 設定本次下載的 UUID 臨時目錄
         self.setup_temp_download_dir()
 
         try:
             # 首先解析表格資料以獲取發票資訊
             invoice_data = self._parse_invoice_table()
-            
+
             # 如果沒有發票資料，直接返回，不執行下載
             if not invoice_data:
                 safe_print("⚠️ 沒有找到發票資料，跳過下載")
                 return []
-            
+
             safe_print(f"✅ 找到 {len(invoice_data)} 筆發票資料，準備進入詳細頁面下載")
 
             all_downloaded_files = []
@@ -773,7 +777,7 @@ class FreightScraper(BaseScraper):
             # 對每一筆發票資料進行處理
             for idx, invoice_info in enumerate(invoice_data, 1):
                 safe_print(f"📄 處理第 {idx}/{len(invoice_data)} 筆發票: {invoice_info['invoice_number']}")
-                
+
                 try:
                     # 步驟 1: 點擊發票編號進入詳細頁面
                     detail_page_success = self._click_invoice_number(invoice_info['invoice_number'])
@@ -781,12 +785,12 @@ class FreightScraper(BaseScraper):
                         safe_print(f"⚠️ 無法進入發票 {invoice_info['invoice_number']} 的詳細頁面，跳過")
                         continue
 
-                    # 步驟 2: 等待詳細頁面載入
-                    time.sleep(3)
+                    # 步驟 2: 智慧等待詳細頁面載入
+                    self.smart_wait_for_element(By.ID, "lnkbtnDownloadInvoice", timeout=10, visible=False)
 
                     # 步驟 3: 在詳細頁面點擊下載表格按鈕
                     downloaded_file = self._download_invoice_detail(invoice_info)
-                    
+
                     if downloaded_file:
                         all_downloaded_files.extend(downloaded_file)
                         safe_print(f"✅ 成功下載發票 {invoice_info['invoice_number']}")
@@ -795,7 +799,8 @@ class FreightScraper(BaseScraper):
 
                     # 步驟 4: 返回列表頁面
                     self._return_to_list_page()
-                    time.sleep(2)
+                    # 智慧等待列表頁面載入
+                    self.smart_wait_for_element(By.ID, "grdList", timeout=10, visible=False)
 
                 except Exception as e:
                     safe_print(f"❌ 處理發票 {invoice_info['invoice_number']} 時發生錯誤: {e}")
@@ -820,38 +825,39 @@ class FreightScraper(BaseScraper):
     def _click_invoice_number(self, invoice_number):
         """點擊發票編號進入詳細頁面"""
         safe_print(f"🖱️ 點擊發票編號: {invoice_number}")
-        
+
         try:
             # 在表格中尋找對應的發票編號連結
             table = self.driver.find_element(By.ID, "grdList")
             rows = table.find_elements(By.TAG_NAME, "tr")
-            
+
             for row in rows[1:]:  # 跳過標題行
                 try:
                     cells = row.find_elements(By.TAG_NAME, "td")
                     if len(cells) >= 3:
                         # 檢查發票編號欄位（第3欄）
                         invoice_cell = cells[3]
-                        
+
                         # 尋找連結
                         try:
                             invoice_link = invoice_cell.find_element(By.TAG_NAME, "a")
                             link_text = invoice_link.text.strip()
-                            
+
                             if link_text == invoice_number:
                                 safe_print(f"✅ 找到發票編號連結: {invoice_number}")
                                 # 使用 JavaScript 點擊以避免元素被遮擋
                                 self.driver.execute_script("arguments[0].click();", invoice_link)
+                                self.smart_wait(1)  # 等待頁面跳轉
                                 return True
                         except:
                             continue
-                            
+
                 except Exception as e:
                     continue
-            
+
             safe_print(f"❌ 找不到發票編號 {invoice_number} 的連結")
             return False
-            
+
         except Exception as e:
             safe_print(f"❌ 點擊發票編號失敗: {e}")
             return False
@@ -859,14 +865,14 @@ class FreightScraper(BaseScraper):
     def _download_invoice_detail(self, invoice_info):
         """在詳細頁面下載發票表格"""
         safe_print("📥 在詳細頁面下載發票表格...")
-        
+
         try:
             # 記錄下載前的檔案
             files_before = set(self.download_dir.glob("*"))
-            
+
             # 尋找 lnkbtnDownloadInvoice 下載按鈕
             download_button = None
-            
+
             try:
                 # 方法 1: 直接使用 ID
                 download_button = self.driver.find_element(By.ID, "lnkbtnDownloadInvoice")
@@ -875,10 +881,10 @@ class FreightScraper(BaseScraper):
                 else:
                     safe_print("⚠️ lnkbtnDownloadInvoice 按鈕不可見")
                     download_button = None
-                    
+
             except Exception as e:
                 safe_print(f"⚠️ 找不到 lnkbtnDownloadInvoice: {e}")
-                
+
                 # 方法 2: 使用文字內容尋找
                 try:
                     links = self.driver.find_elements(By.TAG_NAME, "a")
@@ -889,14 +895,14 @@ class FreightScraper(BaseScraper):
                             break
                 except:
                     pass
-            
+
             if not download_button:
                 safe_print("❌ 找不到下載表格按鈕")
                 return []
-            
+
             # 點擊下載按鈕
             safe_print("🖱️ 點擊下載表格按鈕...")
-            
+
             try:
                 # 如果是 JavaScript 連結，需要執行 JavaScript
                 href = download_button.get_attribute('href')
@@ -905,11 +911,11 @@ class FreightScraper(BaseScraper):
                     self.driver.execute_script("arguments[0].click();", download_button)
                 else:
                     download_button.click()
-                
+
                 safe_print("✅ 已點擊下載表格按鈕")
-                
+
                 # 檢查是否有確認對話框
-                time.sleep(1)
+                self.smart_wait(0.5)
                 try:
                     alert = self.driver.switch_to.alert
                     alert_text = alert.text
@@ -917,15 +923,15 @@ class FreightScraper(BaseScraper):
                     alert.accept()
                 except:
                     pass
-                
+
             except Exception as e:
                 safe_print(f"❌ 點擊下載按鈕失敗: {e}")
                 return []
-            
+
             # 等待檔案下載
             safe_print("⏳ 等待檔案下載...")
             downloaded_files = self._wait_for_download(files_before)
-            
+
             if downloaded_files:
                 # 重命名檔案
                 renamed_files = self._rename_downloaded_files_with_invoice_info(downloaded_files, [invoice_info])
@@ -936,7 +942,7 @@ class FreightScraper(BaseScraper):
             else:
                 safe_print("⚠️ 沒有檢測到新的下載檔案")
                 return []
-                
+
         except Exception as e:
             safe_print(f"❌ 下載發票詳細頁面失敗: {e}")
             return []
@@ -944,17 +950,18 @@ class FreightScraper(BaseScraper):
     def _return_to_list_page(self):
         """返回發票列表頁面"""
         safe_print("🔙 返回發票列表頁面...")
-        
+
         try:
             # 方法 1: 使用瀏覽器的返回按鈕
+            old_url = self.driver.current_url
             self.driver.back()
-            time.sleep(2)
+            self.smart_wait_for_url_change(old_url, timeout=5)
             safe_print("✅ 已返回列表頁面")
             return True
-            
+
         except Exception as e:
             safe_print(f"⚠️ 返回列表頁面失敗: {e}")
-            
+
             # 方法 2: 重新導航到對帳單明細頁面
             try:
                 safe_print("🔄 嘗試重新導航到對帳單明細頁面...")
@@ -962,41 +969,33 @@ class FreightScraper(BaseScraper):
                 if nav_success:
                     # 重新設定日期並搜尋
                     self.set_invoice_date_range()
-                    time.sleep(1)
+                    self.smart_wait(0.5)
                     self._click_search_button()
-                    time.sleep(3)
+                    self.smart_wait_for_ajax(timeout=15)
                     safe_print("✅ 重新導航並搜尋成功")
                     return True
             except Exception as nav_e:
                 safe_print(f"❌ 重新導航失敗: {nav_e}")
-            
+
             return False
 
     def _wait_for_download(self, files_before, timeout=60):
-        """等待檔案下載完成"""
+        """等待檔案下載完成 - 使用智慧等待"""
         safe_print(f"⏳ 等待檔案下載完成（最多 {timeout} 秒）...")
 
-        for i in range(timeout):
-            time.sleep(1)
-            files_after = set(self.download_dir.glob("*"))
-            new_files = files_after - files_before
+        # 使用智慧檔案下載等待
+        downloaded_files = self.smart_wait_for_file_download(
+            expected_extension='.xlsx',
+            timeout=timeout,
+            check_interval=0.5
+        )
 
-            if new_files:
-                # 檢查檔案是否下載完成（不是 .crdownload 或 .tmp）
-                completed_files = []
-                for file_path in new_files:
-                    if not str(file_path).endswith(('.crdownload', '.tmp', '.part')):
-                        completed_files.append(file_path)
+        if downloaded_files:
+            safe_print(f"✅ 檔案下載完成: {len(downloaded_files)} 個檔案")
+        else:
+            safe_print("⚠️ 檔案下載超時")
 
-                if completed_files:
-                    safe_print(f"✅ 檔案下載完成: {len(completed_files)} 個檔案")
-                    return completed_files
-
-            if i % 10 == 0:
-                safe_print(f"   等待中... ({i}/{timeout} 秒)")
-
-        safe_print("⚠️ 檔案下載超時")
-        return []
+        return downloaded_files
 
     def _parse_invoice_table(self):
         """解析發票明細表格以獲取發票資訊"""
