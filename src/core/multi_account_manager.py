@@ -20,7 +20,7 @@ class MultiAccountManager:
     def __init__(self, config_file="accounts.json"):
         self.config_file = config_file
         self.load_config()
-        
+
         # 執行時間統計
         self.total_start_time = None
         self.total_end_time = None
@@ -65,7 +65,7 @@ class MultiAccountManager:
         # 開始總執行時間計時
         self.total_start_time = datetime.now()
         safe_print(f"⏱️ 總執行開始時間: {self.total_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        
+
         accounts = self.get_enabled_accounts()
         results = []
         settings = self.config.get("settings", {})
@@ -109,13 +109,13 @@ class MultiAccountManager:
                 scraper_init_kwargs.update(scraper_kwargs)
 
                 scraper = scraper_class(**scraper_init_kwargs)
-                
+
                 result = scraper.run_full_process()
-                
+
                 # 將時間統計添加到結果中
                 execution_summary = scraper.get_execution_summary()
                 result.update(execution_summary)
-                
+
                 results.append(result)
 
                 # 帳號間暫停一下避免過於頻繁
@@ -173,12 +173,12 @@ class MultiAccountManager:
                 username = result["username"]
                 download_count = len(result["downloads"])
                 duration_minutes = result.get("duration_minutes", 0)
-                
+
                 if result.get("message") == "無資料可下載":
                     safe_print(f"   🔸 {username}: 無資料可下載 (執行時間: {duration_minutes:.2f} 分鐘)")
                 else:
                     safe_print(f"   🔸 {username}: 成功下載 {download_count} 個檔案 (執行時間: {duration_minutes:.2f} 分鐘)")
-                
+
                 # 顯示期間詳細資訊（如果有的話）
                 period_details = result.get("period_details", [])
                 if period_details:
@@ -189,7 +189,7 @@ class MultiAccountManager:
                         end_date = detail["end_date"]
                         status = detail["status"]
                         file_count = len(detail["files"])
-                        
+
                         if status == "success":
                             safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ✅ 成功下載 {file_count} 個檔案")
                         elif status == "no_records":

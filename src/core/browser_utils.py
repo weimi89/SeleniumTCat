@@ -116,7 +116,7 @@ def init_chrome_browser(headless=False, download_dir=None):
             # 抑制 ChromeDriverManager 的輸出
             import logging
             logging.getLogger('WDM').setLevel(logging.WARNING)
-            
+
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
             safe_print("✅ 使用 WebDriver Manager 啟動 Chrome")

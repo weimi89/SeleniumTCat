@@ -63,12 +63,199 @@ class BaseScraper:
         for dir_path in [self.reports_dir, self.logs_dir, self.temp_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
 
+    # ==================== 智慧等待方法 ====================
+    # 以下方法用於替代固定 time.sleep()，提升執行效率
+
+    def smart_wait(self, condition, timeout=10, poll_frequency=0.5, error_message="等待條件超時"):
+        """
+        智慧等待 - 條件滿足立即返回，替代固定 time.sleep()
+
+        Args:
+            condition: WebDriverWait 條件或 lambda 函數
+            timeout: 最長等待時間（秒），預設 10 秒
+            poll_frequency: 輪詢頻率（秒），預設 0.5 秒
+            error_message: 超時錯誤訊息
+
+        Returns:
+            條件滿足時的元素或布林值
+
+        Example:
+            # 等待元素出現
+            element = self.smart_wait(
+                EC.presence_of_element_located((By.ID, "myElement"))
+            )
+
+            # 等待 URL 變化
+            self.smart_wait(
+                lambda d: 'Login.aspx' not in d.current_url,
+                timeout=15
+            )
+        """
+        try:
+            return WebDriverWait(
+                self.driver,
+                timeout,
+                poll_frequency=poll_frequency
+            ).until(condition)
+        except Exception as e:
+            safe_print(f"⚠️ {error_message}: {e}")
+            return None
+
+    def smart_wait_for_url_change(self, old_url=None, timeout=10):
+        """
+        智慧等待 URL 變化
+
+        Args:
+            old_url: 舊 URL，若為 None 則使用當前 URL
+            timeout: 最長等待時間（秒）
+
+        Returns:
+            是否成功變化
+        """
+        if old_url is None:
+            old_url = self.driver.current_url
+
+        try:
+            WebDriverWait(self.driver, timeout).until(
+                lambda d: d.current_url != old_url
+            )
+            safe_print(f"✅ URL 已變化: {old_url} → {self.driver.current_url}")
+            return True
+        except:
+            safe_print(f"⚠️ URL 在 {timeout} 秒內未變化")
+            return False
+
+    def smart_wait_for_element(self, by, value, timeout=10, visible=True):
+        """
+        智慧等待元素出現
+
+        Args:
+            by: 定位方式 (By.ID, By.XPATH, 等)
+            value: 定位值
+            timeout: 最長等待時間（秒）
+            visible: 是否需要可見，預設 True
+
+        Returns:
+            找到的元素或 None
+        """
+        try:
+            if visible:
+                element = WebDriverWait(self.driver, timeout).until(
+                    EC.visibility_of_element_located((by, value))
+                )
+            else:
+                element = WebDriverWait(self.driver, timeout).until(
+                    EC.presence_of_element_located((by, value))
+                )
+            return element
+        except:
+            safe_print(f"⚠️ 在 {timeout} 秒內未找到元素: {by}={value}")
+            return None
+
+    def smart_wait_for_clickable(self, by, value, timeout=10):
+        """
+        智慧等待元素可點擊
+
+        Args:
+            by: 定位方式
+            value: 定位值
+            timeout: 最長等待時間（秒）
+
+        Returns:
+            可點擊的元素或 None
+        """
+        try:
+            element = WebDriverWait(self.driver, timeout).until(
+                EC.element_to_be_clickable((by, value))
+            )
+            return element
+        except:
+            safe_print(f"⚠️ 在 {timeout} 秒內元素未變為可點擊: {by}={value}")
+            return None
+
+    def smart_wait_for_ajax(self, timeout=15):
+        """
+        智慧等待 AJAX 請求完成（jQuery 或原生 fetch）
+
+        Args:
+            timeout: 最長等待時間（秒）
+
+        Returns:
+            是否完成
+        """
+        try:
+            # 等待 jQuery AJAX 完成
+            WebDriverWait(self.driver, timeout).until(
+                lambda d: d.execute_script("return typeof jQuery !== 'undefined' ? jQuery.active === 0 : true")
+            )
+            safe_print("✅ AJAX 請求已完成")
+            return True
+        except:
+            safe_print(f"⚠️ AJAX 在 {timeout} 秒內未完成")
+            return False
+
+    def smart_wait_for_file_download(self, expected_extension=None, timeout=30, check_interval=0.5):
+        """
+        智慧等待檔案下載完成
+
+        Args:
+            expected_extension: 預期的檔案副檔名（如 '.xlsx'），None 表示任何檔案
+            timeout: 最長等待時間（秒）
+            check_interval: 檢查間隔（秒）
+
+        Returns:
+            下載的檔案清單
+        """
+        if not self.download_dir:
+            safe_print("⚠️ 下載目錄未設定")
+            return []
+
+        safe_print(f"⏳ 等待檔案下載... (最多 {timeout} 秒)")
+        start_time = time.time()
+        downloaded_files = []
+
+        while time.time() - start_time < timeout:
+            # 檢查下載目錄中的檔案
+            files = list(self.download_dir.glob("*"))
+
+            # 排除臨時檔案（.crdownload, .tmp）
+            valid_files = [
+                f for f in files
+                if f.suffix.lower() not in ['.crdownload', '.tmp', '.part']
+            ]
+
+            # 如果指定了副檔名，進一步過濾
+            if expected_extension:
+                valid_files = [
+                    f for f in valid_files
+                    if f.suffix.lower() == expected_extension.lower()
+                ]
+
+            if valid_files:
+                # 找到新檔案
+                new_files = [f for f in valid_files if f not in downloaded_files]
+                if new_files:
+                    for new_file in new_files:
+                        safe_print(f"✅ 檢測到下載檔案: {new_file.name}")
+                        downloaded_files.append(new_file)
+
+                    # 等待一小段時間確保檔案完全寫入
+                    time.sleep(1)
+                    return downloaded_files
+
+            time.sleep(check_interval)
+
+        safe_print(f"⚠️ 在 {timeout} 秒內未檢測到下載檔案")
+        return downloaded_files
+
+    # ==================== 原有方法 ====================
+
     def init_browser(self):
         """初始化瀏覽器"""
         # 使用預設的 downloads 目錄初始化瀏覽器
         # 實際的 UUID 臨時目錄將在需要下載時才建立
         default_download_dir = self.final_download_dir
-        
+
         self.driver, self.wait = init_chrome_browser(
             headless=self.headless,
             download_dir=str(default_download_dir.absolute())
@@ -442,11 +629,11 @@ class BaseScraper:
         temp_uuid = str(uuid.uuid4())
         self.download_dir = Path("temp") / temp_uuid
         self.download_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # 如果瀏覽器已經啟動，動態設定下載目錄
         if hasattr(self, 'driver') and self.driver:
             self.set_download_directory(self.download_dir)
-        
+
         safe_print(f"📁 建立臨時下載目錄: {self.download_dir}")
 
     def create_temp_download_dir(self):
@@ -461,11 +648,11 @@ class BaseScraper:
     def move_and_cleanup_files(self, downloaded_files, renamed_files):
         """
         將重命名後的檔案從臨時目錄移動到最終下載目錄，並清理臨時目錄
-        
+
         Args:
             downloaded_files: 原始下載的檔案清單
             renamed_files: 重命名後的檔案清單
-            
+
         Returns:
             最終目錄中的檔案清單
         """
