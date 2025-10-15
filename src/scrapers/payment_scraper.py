@@ -469,7 +469,7 @@ class PaymentScraper(BaseScraper):
                     self.smart_wait(
                         lambda d: d.execute_script("return document.readyState") == "complete",
                         timeout=10,
-                        message="頁面載入完成"
+                        error_message="頁面載入完成"
                     )
 
                     current_url = self.driver.current_url
@@ -662,7 +662,7 @@ class PaymentScraper(BaseScraper):
                     self.smart_wait(
                         lambda d: d.execute_script("return document.readyState") == "complete",
                         timeout=10,
-                        message="首頁載入完成"
+                        error_message="首頁載入完成"
                     )
 
                     # 再次嘗試登入
@@ -723,7 +723,7 @@ class PaymentScraper(BaseScraper):
             self.smart_wait(
                 lambda d: d.execute_script("return document.readyState") == "complete",
                 timeout=10,
-                message="結算期間頁面載入完成"
+                error_message="結算期間頁面載入完成"
             )
 
             # 專門尋找 ddlDate 選單
@@ -1074,7 +1074,7 @@ class PaymentScraper(BaseScraper):
                     self.smart_wait(
                         lambda d: d.execute_script("return document.readyState") == "complete",
                         timeout=5,
-                        message="頁面穩定"
+                        error_message="頁面穩定"
                     )
 
             for selector_type, selector_value in download_selectors:
