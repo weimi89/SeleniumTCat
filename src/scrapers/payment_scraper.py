@@ -346,8 +346,10 @@ class PaymentScraper(BaseScraper):
 
                         if link.is_displayed() and link.is_enabled():
                             print("   點擊 JavaScript 連結...")
+                            old_url = self.driver.current_url
                             link.click()
-                            time.sleep(5)
+                            # 智慧等待頁面響應（URL 變化或頁面載入完成）
+                            self.smart_wait_for_url_change(old_url=old_url, timeout=10)
 
                             current_url = self.driver.current_url
                             print(f"   📍 點擊後 URL: {current_url}")
@@ -380,8 +382,10 @@ class PaymentScraper(BaseScraper):
 
                         if link.is_displayed() and link.is_enabled():
                             print("   點擊 FuncNo=165 連結...")
+                            old_url = self.driver.current_url
                             link.click()
-                            time.sleep(5)
+                            # 智慧等待頁面響應（URL 變化或頁面載入完成）
+                            self.smart_wait_for_url_change(old_url=old_url, timeout=10)
 
                             current_url = self.driver.current_url
                             print(f"   📍 點擊後 URL: {current_url}")
