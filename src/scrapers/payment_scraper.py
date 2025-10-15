@@ -1063,10 +1063,19 @@ class PaymentScraper(BaseScraper):
 
             download_buttons_found = []
 
-            # 等待一段時間確保 AJAX 完全載入
+            # 智慧等待下載按鈕元素載入（如果執行了查詢）
             if query_executed:
-                print("   等待 AJAX 內容完全載入...")
-                time.sleep(5)
+                print("   等待下載按鈕載入...")
+                try:
+                    # 等待下載按鈕出現（使用 ID 選擇器優先）
+                    self.smart_wait_for_element(By.ID, "lnkbtnDownload", timeout=10, visible=False)
+                except Exception:
+                    # 如果找不到特定 ID，等待頁面穩定
+                    self.smart_wait(
+                        lambda d: d.execute_script("return document.readyState") == "complete",
+                        timeout=5,
+                        message="頁面穩定"
+                    )
 
             for selector_type, selector_value in download_selectors:
                 try:
