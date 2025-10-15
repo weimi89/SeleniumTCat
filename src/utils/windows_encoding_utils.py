@@ -8,6 +8,7 @@ Windows 編碼處理共用函式
 import sys
 import os
 
+
 def safe_print(message):
     """Windows 相容的列印函數"""
     if sys.platform == "win32":
@@ -43,6 +44,7 @@ def safe_print(message):
         message = message.replace("⏭️", "[SKIP]")
     print(message)
 
+
 def setup_windows_encoding():
     """設定 Windows UTF-8 支援（如果可能）"""
     global safe_print
@@ -50,12 +52,13 @@ def setup_windows_encoding():
     if sys.platform == "win32":
         try:
             # 設定控制台代碼頁為 UTF-8
-            os.system('chcp 65001 > nul 2>&1')
+            os.system("chcp 65001 > nul 2>&1")
 
             # 設定控制台輸出編碼為 UTF-8
             import codecs
-            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
-            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+            sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer, "strict")
+            sys.stderr = codecs.getwriter("utf-8")(sys.stderr.buffer, "strict")
 
             # 如果成功，使用正常的 print
             safe_print = print
@@ -65,9 +68,10 @@ def setup_windows_encoding():
             return False
     return True
 
+
 def check_pythonunbuffered():
     """檢查並強制設定 PYTHONUNBUFFERED 環境變數"""
-    if not os.environ.get('PYTHONUNBUFFERED'):
+    if not os.environ.get("PYTHONUNBUFFERED"):
         safe_print("⚠️ 偵測到未設定 PYTHONUNBUFFERED 環境變數")
         safe_print("📝 請使用以下方式執行以確保即時輸出：")
         if sys.platform == "win32":
@@ -103,14 +107,15 @@ def check_pythonunbuffered():
             print("")
             print("   或手動設定:")
             print("   export PYTHONUNBUFFERED=1")
-            print("   PYTHONPATH=\"$(pwd)\" uv run python -u src/scrapers/payment_scraper.py")
-            print("   PYTHONPATH=\"$(pwd)\" uv run python -u src/scrapers/freight_scraper.py")
-            print("   PYTHONPATH=\"$(pwd)\" uv run python -u src/scrapers/unpaid_scraper.py")
+            print('   PYTHONPATH="$(pwd)" uv run python -u src/scrapers/payment_scraper.py')
+            print('   PYTHONPATH="$(pwd)" uv run python -u src/scrapers/freight_scraper.py')
+            print('   PYTHONPATH="$(pwd)" uv run python -u src/scrapers/unpaid_scraper.py')
         print("")
         safe_print("❌ 程式將退出，請使用上述方式重新執行")
         sys.exit(1)
 
     safe_print("✅ PYTHONUNBUFFERED 環境變數已設定")
+
 
 # 初始化 Windows 編碼支援
 setup_windows_encoding()

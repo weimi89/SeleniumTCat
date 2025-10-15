@@ -6,7 +6,7 @@ import os
 import time
 
 # 導入共用模組
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 from src.utils.windows_encoding_utils import safe_print, check_pythonunbuffered
 from src.core.base_scraper import BaseScraper
 from src.core.multi_account_manager import MultiAccountManager
@@ -51,7 +51,7 @@ class UnpaidScraper(BaseScraper):
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
-                time.sleep(1)  # 短暫間隔
+                # 移除固定等待，後續的智慧等待已足夠
 
             try:
                 # 智慧等待登入完成
@@ -114,7 +114,7 @@ class UnpaidScraper(BaseScraper):
                         self.smart_wait_for_url_change(timeout=5)
 
                         # 檢查是否需要重新登入
-                        if 'Login.aspx' in self.driver.current_url:
+                        if "Login.aspx" in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
                             self.login()
                             self.smart_wait_for_url_change(timeout=10)
@@ -135,13 +135,13 @@ class UnpaidScraper(BaseScraper):
             # 基於用戶提供的 URL 格式，使用 FuncNo=167 (交易明細表)
             direct_urls = [
                 # 使用 RedirectFunc 的正確方式（基於用戶提供的 FuncNo=167）
-                'https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167',
+                "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167",
                 # 直接訪問交易明細頁面
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx?TimeOut=N',
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx',
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx?TimeOut=N",
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx",
                 # 添加更多後備 URL
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx?DetailType=01',
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx?DetailType=02',
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx?DetailType=01",
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentDetail.aspx?DetailType=02",
             ]
 
             max_retries = 2  # 每個 URL 最多重試 2 次
@@ -155,7 +155,8 @@ class UnpaidScraper(BaseScraper):
 
                     try:
                         self.driver.get(full_url)
-                        time.sleep(1)  # 短暫等待以檢測 alert
+                        # 短暫等待以檢測 alert（保留此處固定等待，因 alert 檢測需要）
+                        time.sleep(0.5)
 
                         # 處理可能的 alert 彈窗
                         alert_result = self._handle_alerts()
@@ -165,7 +166,12 @@ class UnpaidScraper(BaseScraper):
                         elif alert_result:
                             print("   🔔 處理了安全提示或其他彈窗")
 
-                        self.smart_wait(1)  # 等待頁面穩定
+                        # 智慧等待頁面完全載入（document.readyState == 'complete'）
+                        self.smart_wait(
+                            lambda d: d.execute_script("return document.readyState") == "complete",
+                            timeout=10,
+                            error_message="頁面載入完成",
+                        )
 
                         current_url = self.driver.current_url
                         print(f"   導航後 URL: {current_url}")
@@ -177,7 +183,12 @@ class UnpaidScraper(BaseScraper):
                                 print("   ✅ 重新登入成功，重試導航...")
                                 # 重新嘗試當前 URL
                                 self.driver.get(full_url)
-                                self.smart_wait(1)
+                                # 智慧等待頁面完全載入
+                                self.smart_wait(
+                                    lambda d: d.execute_script("return document.readyState") == "complete",
+                                    timeout=10,
+                                    error_message="重新登入後頁面載入完成",
+                                )
                                 current_url = self.driver.current_url
                             else:
                                 print("   ❌ 重新登入失敗")
@@ -192,7 +203,8 @@ class UnpaidScraper(BaseScraper):
 
                         # 如果這次嘗試失敗，但還有重試機會，則稍等片刻再重試
                         if retry < max_retries:
-                            time.sleep(1)
+                            # 移除固定等待，直接重試
+                            pass
                         else:
                             break  # 跳出重試循環，嘗試下一個 URL
 
@@ -208,7 +220,8 @@ class UnpaidScraper(BaseScraper):
                                 return False  # 終止當前帳號處理
 
                         if retry < max_retries:
-                            time.sleep(2)
+                            # 短暫等待後重試（alert 處理後需要一些時間穩定）
+                            time.sleep(0.5)
                         continue
 
             print("   ❌ 所有直接 URL 嘗試都失敗")
@@ -265,16 +278,16 @@ class UnpaidScraper(BaseScraper):
 
             # 尋找所有可能的帳務選單元素
             all_elements = (
-                self.driver.find_elements(By.TAG_NAME, "a") +
-                self.driver.find_elements(By.TAG_NAME, "div") +
-                self.driver.find_elements(By.TAG_NAME, "span") +
-                self.driver.find_elements(By.TAG_NAME, "td") +
-                self.driver.find_elements(By.TAG_NAME, "li")
+                self.driver.find_elements(By.TAG_NAME, "a")
+                + self.driver.find_elements(By.TAG_NAME, "div")
+                + self.driver.find_elements(By.TAG_NAME, "span")
+                + self.driver.find_elements(By.TAG_NAME, "td")
+                + self.driver.find_elements(By.TAG_NAME, "li")
             )
 
             for element in all_elements:
                 try:
-                    element_text = element.text or element.get_attribute('title') or ''
+                    element_text = element.text or element.get_attribute("title") or ""
                     element_text = element_text.strip()
 
                     if any(keyword in element_text for keyword in accounting_keywords):
@@ -302,11 +315,11 @@ class UnpaidScraper(BaseScraper):
 
             for link in links:
                 try:
-                    href = link.get_attribute('href') or ''
-                    text = link.text or ''
+                    href = link.get_attribute("href") or ""
+                    text = link.text or ""
 
                     # 優先匹配特定的 URL 模式
-                    if 'RedirectFunc.aspx?FuncNo=167' in href:
+                    if "RedirectFunc.aspx?FuncNo=167" in href:
                         if link.is_displayed() and link.is_enabled():
                             safe_print(f"✅ 找到交易明細表連結: '{text}' ({href})")
                             link.click()
@@ -335,19 +348,16 @@ class UnpaidScraper(BaseScraper):
             page_source = self.driver.page_source
 
             # 檢查 URL 是否包含預期的頁面標識
-            url_indicators = [
-                "SudaPaymentDetail.aspx",
-                "TimeOut=N"
-            ]
+            url_indicators = ["SudaPaymentDetail.aspx", "TimeOut=N"]
 
             # 基於真實 HTML 結構的精確內容檢查
             content_indicators = [
-                "交易明細表",            # 頁面標題
-                "週期",                # 週期選擇
-                "lnkbtnDownload",      # 下載按鈕 ID（基於用戶提供的）
-                "交易明細下載",         # 下載按鈕文字（基於用戶提供的）
-                "開始日期",            # 日期選擇欄位
-                "結束日期"             # 日期選擇欄位
+                "交易明細表",  # 頁面標題
+                "週期",  # 週期選擇
+                "lnkbtnDownload",  # 下載按鈕 ID（基於用戶提供的）
+                "交易明細下載",  # 下載按鈕文字（基於用戶提供的）
+                "開始日期",  # 日期選擇欄位
+                "結束日期",  # 日期選擇欄位
             ]
 
             url_match = any(indicator in current_url for indicator in url_indicators)
@@ -358,7 +368,7 @@ class UnpaidScraper(BaseScraper):
             try:
                 # 檢查關鍵元素是否存在
                 key_elements = [
-                    ("ID", "lnkbtnDownload"),   # 下載按鈕
+                    ("ID", "lnkbtnDownload"),  # 下載按鈕
                 ]
 
                 found_elements = 0
@@ -393,32 +403,22 @@ class UnpaidScraper(BaseScraper):
             page_source = self.driver.page_source
 
             # 檢查 URL 是否包含會話超時相關的訊息
-            timeout_indicators = [
-                'MsgCenter.aspx',
-                '系統閒置過久',
-                '請重新登入'
-            ]
+            timeout_indicators = ["MsgCenter.aspx", "系統閒置過久", "請重新登入"]
 
             # 檢查 URL - 特別處理 TimeOut 參數
             if any(indicator in current_url for indicator in timeout_indicators):
                 return True
 
             # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
-            if 'TimeOut=Y' in current_url:
+            if "TimeOut=Y" in current_url:
                 return True
 
             # 檢查其他 Session 相關但排除正常情況
-            if 'Session' in current_url and 'SessionExpired' in current_url:
+            if "Session" in current_url and "SessionExpired" in current_url:
                 return True
 
             # 檢查頁面內容
-            timeout_messages = [
-                '系統閒置過久',
-                '請重新登入',
-                'Session timeout',
-                'Session expired',
-                '會話超時'
-            ]
+            timeout_messages = ["系統閒置過久", "請重新登入", "Session timeout", "Session expired", "會話超時"]
 
             if any(message in page_source for message in timeout_messages):
                 return True
@@ -452,7 +452,7 @@ class UnpaidScraper(BaseScraper):
             login_urls = [
                 "https://www.takkyubin.com.tw/YMTContract/Login.aspx",
                 "https://www.takkyubin.com.tw/YMTContract/",
-                "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+                "https://www.takkyubin.com.tw/YMTContract/default.aspx",
             ]
 
             login_success = False
@@ -467,7 +467,7 @@ class UnpaidScraper(BaseScraper):
                     print(f"   導航後 URL: {current_url}")
 
                     # 檢查是否成功到達登入頁面
-                    if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
+                    if "Login.aspx" in current_url or "登入" in self.driver.page_source:
                         print("   ✅ 成功到達登入頁面")
 
                         # 重新執行登入流程
@@ -613,7 +613,9 @@ class UnpaidScraper(BaseScraper):
                     downloaded_files.extend(period_result["files"])
                     safe_print(f"✅ 第 {period} 期下載完成: {len(period_result['files'])} 個檔案")
                 elif period_result["status"] == "no_records":
-                    safe_print(f"⚠️ 第 {period} 期無交易記錄 ({period_result['start_date']} - {period_result['end_date']})")
+                    safe_print(
+                        f"⚠️ 第 {period} 期無交易記錄 ({period_result['start_date']} - {period_result['end_date']})"
+                    )
                 else:
                     safe_print(f"⚠️ 第 {period} 期下載失敗: {period_result.get('error', '未知錯誤')}")
 
@@ -672,7 +674,7 @@ class UnpaidScraper(BaseScraper):
             "status": "unknown",
             "files": [],
             "error": None,
-            "record_count": 0
+            "record_count": 0,
         }
 
         for retry in range(max_retries):
@@ -956,7 +958,10 @@ class UnpaidScraper(BaseScraper):
 
             # 如果 ID 搜尋失敗，嘗試通用搜尋
             try:
-                search_buttons = self.driver.find_elements(By.CSS_SELECTOR, "input[type='submit'][value*='搜'], input[type='button'][value*='搜'], button[value*='搜']")
+                search_buttons = self.driver.find_elements(
+                    By.CSS_SELECTOR,
+                    "input[type='submit'][value*='搜'], input[type='button'][value*='搜'], button[value*='搜']",
+                )
                 for button in search_buttons:
                     if button.is_displayed() and button.is_enabled():
                         safe_print("✅ 找到通用搜尋按鈕")
@@ -981,10 +986,7 @@ class UnpaidScraper(BaseScraper):
 
             for button_id in download_button_ids:
                 download_button = self.smart_wait_for_element(
-                    By.ID,
-                    button_id,
-                    timeout=timeout // len(download_button_ids),
-                    visible=True
+                    By.ID, button_id, timeout=timeout // len(download_button_ids), visible=True
                 )
 
                 if download_button:
@@ -997,7 +999,7 @@ class UnpaidScraper(BaseScraper):
                 By.XPATH,
                 "//*[contains(text(), '下載') or contains(text(), '明細下載') or contains(text(), '交易明細下載')]",
                 timeout=10,
-                visible=True
+                visible=True,
             )
 
             if download_element:
@@ -1047,7 +1049,7 @@ class UnpaidScraper(BaseScraper):
                         ("XPATH", "//a[contains(text(), '下載')]"),
                         ("CSS", "a[href*='Download']"),
                         ("CSS", "input[value*='下載']"),
-                        ("CSS", "button[value*='下載']")
+                        ("CSS", "button[value*='下載']"),
                     ]
 
                     for method, selector in backup_selectors:
@@ -1123,7 +1125,9 @@ class UnpaidScraper(BaseScraper):
             except:
                 # 方法2: 尋找包含 "交易共" 和 "筆" 的文字
                 try:
-                    count_elements = self.driver.find_elements(By.XPATH, "//span[contains(@style, 'color:Red;') or contains(@style, 'color:red;')]")
+                    count_elements = self.driver.find_elements(
+                        By.XPATH, "//span[contains(@style, 'color:Red;') or contains(@style, 'color:red;')]"
+                    )
                     for element in count_elements:
                         if element.text.isdigit():
                             count_element = element
@@ -1157,7 +1161,8 @@ class UnpaidScraper(BaseScraper):
 
                 # 尋找 "交易共 X 筆" 的模式
                 import re
-                pattern = r'交易共.*?(\d+).*?筆'
+
+                pattern = r"交易共.*?(\d+).*?筆"
                 match = re.search(pattern, page_source)
 
                 if match:
@@ -1185,9 +1190,7 @@ class UnpaidScraper(BaseScraper):
 
         # 使用智慧檔案下載等待
         downloaded_files = self.smart_wait_for_file_download(
-            expected_extension='.xlsx',
-            timeout=timeout,
-            check_interval=0.5
+            expected_extension=".xlsx", timeout=timeout, check_interval=0.5
         )
 
         if downloaded_files:
@@ -1223,6 +1226,7 @@ class UnpaidScraper(BaseScraper):
                 # 即使重命名失敗，也要確保檔案有唯一名稱
                 try:
                     import uuid
+
                     backup_filename = f"交易明細_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
                     backup_file_path = file_path.parent / backup_filename
                     file_path.rename(backup_file_path)
@@ -1253,12 +1257,7 @@ class UnpaidScraper(BaseScraper):
             login_success = self.login()
             if not login_success:
                 safe_print(f"❌ 帳號 {self.username} 登入失敗")
-                return {
-                    "success": False,
-                    "username": self.username,
-                    "error": "登入失敗",
-                    "downloads": []
-                }
+                return {"success": False, "username": self.username, "error": "登入失敗", "downloads": []}
 
             # 3. 導航到交易明細表頁面
             nav_success = self.navigate_to_transaction_detail()
@@ -1271,16 +1270,11 @@ class UnpaidScraper(BaseScraper):
                         "username": self.username,
                         "error": "密碼安全警告",
                         "error_type": "security_warning",
-                        "downloads": []
+                        "downloads": [],
                     }
                 else:
                     safe_print(f"❌ 帳號 {self.username} 導航失敗")
-                    return {
-                        "success": False,
-                        "username": self.username,
-                        "error": "導航失敗",
-                        "downloads": []
-                    }
+                    return {"success": False, "username": self.username, "error": "導航失敗", "downloads": []}
 
             # 4. 設定週期搜尋方式
             period_success = self.set_period_search()
@@ -1296,7 +1290,7 @@ class UnpaidScraper(BaseScraper):
                     "success": True,
                     "username": self.username,
                     "downloads": [str(f) for f in downloaded_files],
-                    "period_details": period_details
+                    "period_details": period_details,
                 }
             else:
                 safe_print(f"⚠️ 帳號 {self.username} 沒有下載到檔案")
@@ -1305,7 +1299,7 @@ class UnpaidScraper(BaseScraper):
                     "username": self.username,
                     "message": "無資料可下載",
                     "downloads": [],
-                    "period_details": period_details
+                    "period_details": period_details,
                 }
 
         except Exception as e:
@@ -1315,7 +1309,7 @@ class UnpaidScraper(BaseScraper):
                 "username": self.username,
                 "error": str(e),
                 "downloads": [str(f) for f in downloaded_files],
-                "period_details": getattr(locals(), 'period_details', [])
+                "period_details": getattr(locals(), "period_details", []),
             }
         finally:
             # 結束執行時間計時
@@ -1327,9 +1321,9 @@ def main():
     """主程式入口"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='黑貓宅急便交易明細表自動下載工具')
-    parser.add_argument('--headless', action='store_true', help='使用無頭模式')
-    parser.add_argument('--periods', type=int, default=2, help='要下載的週期數量 (預設: 2)')
+    parser = argparse.ArgumentParser(description="黑貓宅急便交易明細表自動下載工具")
+    parser.add_argument("--headless", action="store_true", help="使用無頭模式")
+    parser.add_argument("--periods", type=int, default=2, help="要下載的週期數量 (預設: 2)")
 
     args = parser.parse_args()
 
@@ -1338,12 +1332,8 @@ def main():
 
         manager = MultiAccountManager("accounts.json")
         # 只有在使用者明確指定 --headless 時才覆蓋設定檔
-        headless_arg = True if '--headless' in sys.argv else None
-        manager.run_all_accounts(
-            UnpaidScraper,
-            headless_override=headless_arg,
-            periods=args.periods
-        )
+        headless_arg = True if "--headless" in sys.argv else None
+        manager.run_all_accounts(UnpaidScraper, headless_override=headless_arg, periods=args.periods)
 
         return 0
 

@@ -6,7 +6,7 @@ import os
 import time
 
 # 導入共用模組
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 from src.utils.windows_encoding_utils import safe_print, check_pythonunbuffered
 from src.core.base_scraper import BaseScraper
 from src.core.multi_account_manager import MultiAccountManager
@@ -55,7 +55,7 @@ class PaymentScraper(BaseScraper):
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
-                time.sleep(3)  # 間隔時間
+                # 移除固定等待，後續的智慧等待已足夠
 
             try:
                 # 智慧等待登入完成 - URL 不再是 Login.aspx
@@ -120,7 +120,7 @@ class PaymentScraper(BaseScraper):
                         time.sleep(3)
 
                         # 檢查是否需要重新登入
-                        if 'Login.aspx' in self.driver.current_url:
+                        if "Login.aspx" in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
                             self.login()
                             time.sleep(3)
@@ -156,8 +156,15 @@ class PaymentScraper(BaseScraper):
 
                 # 尋找導航相關的關鍵字
                 navigation_keywords = [
-                    "貨到付款", "匯款明細", "結算", "查詢", "報表", "COD",
-                    "代收貨款", "財務報表", "統計分析"
+                    "貨到付款",
+                    "匯款明細",
+                    "結算",
+                    "查詢",
+                    "報表",
+                    "COD",
+                    "代收貨款",
+                    "財務報表",
+                    "統計分析",
                 ]
 
                 found_keywords = [kw for kw in navigation_keywords if kw in frame_source]
@@ -201,46 +208,47 @@ class PaymentScraper(BaseScraper):
             all_clickables = all_links + all_buttons + all_inputs + all_divs + all_spans + all_tds + all_lis
 
             # 優先搜尋帳務相關的關鍵字
-            accounting_keywords = [
-                "帳務選單", "帳務", "財務", "會計"
-            ]
+            accounting_keywords = ["帳務選單", "帳務", "財務", "會計"]
 
-            payment_keywords = [
-                "貨到付款匯款明細表", "貨到付款", "匯款明細", "COD",
-                "代收貨款", "付款", "收款", "匯款"
-            ]
+            payment_keywords = ["貨到付款匯款明細表", "貨到付款", "匯款明細", "COD", "代收貨款", "付款", "收款", "匯款"]
 
             # 先尋找帳務選單
             for element in all_clickables:
                 try:
-                    element_text = element.text or element.get_attribute('value') or element.get_attribute('title') or ''
+                    element_text = (
+                        element.text or element.get_attribute("value") or element.get_attribute("title") or ""
+                    )
                     element_text = element_text.strip()
 
                     # 優先匹配帳務選單
                     if any(keyword in element_text for keyword in accounting_keywords):
-                        payment_elements.append({
-                            'element': element,
-                            'text': element_text,
-                            'tag': element.tag_name,
-                            'priority': 1  # 最高優先級
-                        })
+                        payment_elements.append(
+                            {
+                                "element": element,
+                                "text": element_text,
+                                "tag": element.tag_name,
+                                "priority": 1,  # 最高優先級
+                            }
+                        )
                         print(f"      找到帳務選單元素: '{element_text}' ({element.tag_name})")
 
                     # 然後匹配貨到付款相關
                     elif any(keyword in element_text for keyword in payment_keywords):
-                        payment_elements.append({
-                            'element': element,
-                            'text': element_text,
-                            'tag': element.tag_name,
-                            'priority': 2  # 次要優先級
-                        })
+                        payment_elements.append(
+                            {
+                                "element": element,
+                                "text": element_text,
+                                "tag": element.tag_name,
+                                "priority": 2,  # 次要優先級
+                            }
+                        )
                         print(f"      找到支付相關元素: '{element_text}' ({element.tag_name})")
 
                 except:
                     continue
 
             # 按優先級排序
-            payment_elements.sort(key=lambda x: x.get('priority', 3))
+            payment_elements.sort(key=lambda x: x.get("priority", 3))
 
         except Exception as e:
             print(f"   元素搜尋錯誤: {e}")
@@ -290,17 +298,17 @@ class PaymentScraper(BaseScraper):
 
             # 尋找所有可能的元素類型
             all_elements = (
-                self.driver.find_elements(By.TAG_NAME, "a") +
-                self.driver.find_elements(By.TAG_NAME, "div") +
-                self.driver.find_elements(By.TAG_NAME, "span") +
-                self.driver.find_elements(By.TAG_NAME, "td") +
-                self.driver.find_elements(By.TAG_NAME, "li") +
-                self.driver.find_elements(By.TAG_NAME, "button")
+                self.driver.find_elements(By.TAG_NAME, "a")
+                + self.driver.find_elements(By.TAG_NAME, "div")
+                + self.driver.find_elements(By.TAG_NAME, "span")
+                + self.driver.find_elements(By.TAG_NAME, "td")
+                + self.driver.find_elements(By.TAG_NAME, "li")
+                + self.driver.find_elements(By.TAG_NAME, "button")
             )
 
             for element in all_elements:
                 try:
-                    element_text = element.text or element.get_attribute('title') or ''
+                    element_text = element.text or element.get_attribute("title") or ""
                     element_text = element_text.strip()
 
                     if any(keyword in element_text for keyword in accounting_keywords):
@@ -325,16 +333,17 @@ class PaymentScraper(BaseScraper):
             print("   🔍 尋找貨到付款匯款明細表的特殊連結...")
 
             # 專門尋找包含 JavaScript:replaceUrl 的連結
-            javascript_links = self.driver.find_elements(By.XPATH,
-                "//a[contains(@href, 'JavaScript:replaceUrl') or contains(@href, 'javascript:replaceUrl')]")
+            javascript_links = self.driver.find_elements(
+                By.XPATH, "//a[contains(@href, 'JavaScript:replaceUrl') or contains(@href, 'javascript:replaceUrl')]"
+            )
 
             print(f"   找到 {len(javascript_links)} 個 JavaScript 連結")
 
             for i, link in enumerate(javascript_links):
                 try:
-                    link_text = link.text or link.get_attribute('title') or ''
-                    link_href = link.get_attribute('href') or ''
-                    link_class = link.get_attribute('class') or ''
+                    link_text = link.text or link.get_attribute("title") or ""
+                    link_href = link.get_attribute("href") or ""
+                    link_class = link.get_attribute("class") or ""
 
                     print(f"      連結 {i+1}: '{link_text.strip()}'")
                     print(f"         href: {link_href}")
@@ -346,14 +355,16 @@ class PaymentScraper(BaseScraper):
 
                         if link.is_displayed() and link.is_enabled():
                             print("   點擊 JavaScript 連結...")
+                            old_url = self.driver.current_url
                             link.click()
-                            time.sleep(5)
+                            # 智慧等待頁面響應（URL 變化或頁面載入完成）
+                            self.smart_wait_for_url_change(old_url=old_url, timeout=10)
 
                             current_url = self.driver.current_url
                             print(f"   📍 點擊後 URL: {current_url}")
 
                             # 檢查是否成功導航
-                            if 'MsgCenter.aspx' not in current_url and 'ErrorMsg.aspx' not in current_url:
+                            if "MsgCenter.aspx" not in current_url and "ErrorMsg.aspx" not in current_url:
                                 print("   ✅ 成功點擊貨到付款匯款明細表連結")
                                 return True
                             else:
@@ -368,25 +379,26 @@ class PaymentScraper(BaseScraper):
 
             # 如果沒有找到 JavaScript 連結，嘗試尋找包含 FuncNo=165 的連結
             print("   🔍 尋找包含 FuncNo=165 的連結...")
-            funcno_links = self.driver.find_elements(By.XPATH,
-                "//a[contains(@href, 'FuncNo=165')]")
+            funcno_links = self.driver.find_elements(By.XPATH, "//a[contains(@href, 'FuncNo=165')]")
 
             if funcno_links:
                 print(f"   找到 {len(funcno_links)} 個 FuncNo=165 連結")
                 for i, link in enumerate(funcno_links):
                     try:
-                        link_text = link.text or ''
+                        link_text = link.text or ""
                         print(f"      FuncNo 連結 {i+1}: '{link_text.strip()}'")
 
                         if link.is_displayed() and link.is_enabled():
                             print("   點擊 FuncNo=165 連結...")
+                            old_url = self.driver.current_url
                             link.click()
-                            time.sleep(5)
+                            # 智慧等待頁面響應（URL 變化或頁面載入完成）
+                            self.smart_wait_for_url_change(old_url=old_url, timeout=10)
 
                             current_url = self.driver.current_url
                             print(f"   📍 點擊後 URL: {current_url}")
 
-                            if 'MsgCenter.aspx' not in current_url and 'ErrorMsg.aspx' not in current_url:
+                            if "MsgCenter.aspx" not in current_url and "ErrorMsg.aspx" not in current_url:
                                 print("   ✅ 成功點擊 FuncNo=165 連結")
                                 return True
 
@@ -400,7 +412,7 @@ class PaymentScraper(BaseScraper):
 
             for link in all_links:
                 try:
-                    link_text = link.text or ''
+                    link_text = link.text or ""
                     if "貨到付款匯款明細表" in link_text or "貨到付款" in link_text:
                         if link.is_displayed() and link.is_enabled():
                             print(f"   找到通用連結: '{link_text.strip()}'")
@@ -412,7 +424,7 @@ class PaymentScraper(BaseScraper):
                             current_url = self.driver.current_url
                             print(f"   📍 點擊後 URL: {current_url}")
 
-                            if 'MsgCenter.aspx' not in current_url and 'ErrorMsg.aspx' not in current_url:
+                            if "MsgCenter.aspx" not in current_url and "ErrorMsg.aspx" not in current_url:
                                 return True
 
                 except Exception as e:
@@ -431,13 +443,13 @@ class PaymentScraper(BaseScraper):
         # 使用 RedirectFunc 方式和直接 URL，按優先級排序
         direct_urls = [
             # 使用 RedirectFunc 的正確方式（最高優先級）
-            'https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=165',
+            "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=165",
             # 其他可能的直接 URL
-            'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=02&TimeOut=N',
-            'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx',
+            "https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=02&TimeOut=N",
+            "https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx",
             # 添加更多後備 URL
-            'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=01',
-            'https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=03',
+            "https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=01",
+            "https://www.takkyubin.com.tw/YMTContract/aspx/CollectPaymentList3200T.aspx?Settlement=03",
         ]
 
         max_retries = 2  # 每個 URL 最多重試 2 次
@@ -461,7 +473,12 @@ class PaymentScraper(BaseScraper):
                     elif alert_result:
                         print("   🔔 處理了安全提示或其他彈窗")
 
-                    time.sleep(3)  # 等待頁面完全載入
+                    # 智慧等待頁面完全載入（document.readyState == 'complete'）
+                    self.smart_wait(
+                        lambda d: d.execute_script("return document.readyState") == "complete",
+                        timeout=10,
+                        error_message="頁面載入完成",
+                    )
 
                     current_url = self.driver.current_url
                     page_source = self.driver.page_source
@@ -483,12 +500,16 @@ class PaymentScraper(BaseScraper):
                             continue
 
                     # 檢查是否成功（不是錯誤頁面）
-                    if (not any(error_page in current_url for error_page in
-                               ['ErrorMsg.aspx', 'Login.aspx', 'MsgCenter.aspx']) and
-                        current_url != self.url):
+                    if (
+                        not any(
+                            error_page in current_url
+                            for error_page in ["ErrorMsg.aspx", "Login.aspx", "MsgCenter.aspx"]
+                        )
+                        and current_url != self.url
+                    ):
 
                         # 檢查頁面內容是否包含相關關鍵字
-                        success_keywords = ['匯款明細', '貨到付款', '結算', '代收貨款', 'COD', '明細表']
+                        success_keywords = ["匯款明細", "貨到付款", "結算", "代收貨款", "COD", "明細表"]
                         found_keywords = [kw for kw in success_keywords if kw in page_source]
 
                         if found_keywords:
@@ -498,7 +519,7 @@ class PaymentScraper(BaseScraper):
                         else:
                             print(f"   頁面載入但未找到預期內容")
 
-                    elif 'MsgCenter.aspx' in current_url:
+                    elif "MsgCenter.aspx" in current_url:
                         print("   ❌ 導向到訊息頁面，可能是權限問題")
                     else:
                         print(f"   導航失敗或重導向到錯誤頁面")
@@ -534,32 +555,22 @@ class PaymentScraper(BaseScraper):
             page_source = self.driver.page_source
 
             # 檢查 URL 是否包含會話超時相關的訊息
-            timeout_indicators = [
-                'MsgCenter.aspx',
-                '系統閒置過久',
-                '請重新登入'
-            ]
+            timeout_indicators = ["MsgCenter.aspx", "系統閒置過久", "請重新登入"]
 
             # 檢查 URL - 使用更精確的檢查
             if any(indicator in current_url for indicator in timeout_indicators):
                 return True
 
             # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
-            if 'TimeOut=Y' in current_url:
+            if "TimeOut=Y" in current_url:
                 return True
 
             # 檢查其他 Session 相關但排除正常情況
-            if 'Session' in current_url and 'SessionExpired' in current_url:
+            if "Session" in current_url and "SessionExpired" in current_url:
                 return True
 
             # 檢查頁面內容
-            timeout_messages = [
-                '系統閒置過久',
-                '請重新登入',
-                'Session timeout',
-                'Session expired',
-                '會話超時'
-            ]
+            timeout_messages = ["系統閒置過久", "請重新登入", "Session timeout", "Session expired", "會話超時"]
 
             if any(message in page_source for message in timeout_messages):
                 return True
@@ -593,7 +604,7 @@ class PaymentScraper(BaseScraper):
             login_urls = [
                 "https://www.takkyubin.com.tw/YMTContract/Login.aspx",
                 "https://www.takkyubin.com.tw/YMTContract/",
-                "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+                "https://www.takkyubin.com.tw/YMTContract/default.aspx",
             ]
 
             login_success = False
@@ -608,7 +619,7 @@ class PaymentScraper(BaseScraper):
                     print(f"   導航後 URL: {current_url}")
 
                     # 檢查是否成功到達登入頁面
-                    if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
+                    if "Login.aspx" in current_url or "登入" in self.driver.page_source:
                         print("   ✅ 成功到達登入頁面")
 
                         # 重新執行登入流程
@@ -649,7 +660,12 @@ class PaymentScraper(BaseScraper):
 
                     # 回到首頁
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
-                    time.sleep(3)
+                    # 智慧等待頁面載入完成
+                    self.smart_wait(
+                        lambda d: d.execute_script("return document.readyState") == "complete",
+                        timeout=10,
+                        error_message="首頁載入完成",
+                    )
 
                     # 再次嘗試登入
                     final_login_success = self.login()
@@ -705,16 +721,22 @@ class PaymentScraper(BaseScraper):
         safe_print(f"📅 準備下載最新 {self.period_number} 期結算區間...")
 
         try:
-            # 等待頁面載入
-            time.sleep(3)
+            # 智慧等待頁面載入完成
+            self.smart_wait(
+                lambda d: d.execute_script("return document.readyState") == "complete",
+                timeout=10,
+                error_message="結算期間頁面載入完成",
+            )
 
             # 專門尋找 ddlDate 選單
             date_selects = self.driver.find_elements(By.NAME, "ddlDate")
 
             if not date_selects:
                 # 如果找不到 ddlDate，嘗試其他可能的名稱
-                date_selects = self.driver.find_elements(By.CSS_SELECTOR,
-                    "select[name*='date'], select[name*='Date'], select[id*='date'], select[id*='Date']")
+                date_selects = self.driver.find_elements(
+                    By.CSS_SELECTOR,
+                    "select[name*='date'], select[name*='Date'], select[id*='date'], select[id*='Date']",
+                )
 
             if not date_selects:
                 # 最後嘗試所有 select 元素
@@ -724,11 +746,12 @@ class PaymentScraper(BaseScraper):
 
             for i, select_element in enumerate(date_selects):
                 try:
-                    select_name = select_element.get_attribute('name') or f'select_{i}'
-                    select_id = select_element.get_attribute('id') or 'no-id'
+                    select_name = select_element.get_attribute("name") or f"select_{i}"
+                    select_id = select_element.get_attribute("id") or "no-id"
 
                     # 使用 Selenium 的 Select 類
                     from selenium.webdriver.support.ui import Select
+
                     select_obj = Select(select_element)
                     options = select_obj.options
 
@@ -739,46 +762,53 @@ class PaymentScraper(BaseScraper):
                         print("      前3個選項:")
                         for j, option in enumerate(options[:3]):
                             option_text = option.text.strip()
-                            option_value = option.get_attribute('value')
+                            option_value = option.get_attribute("value")
                             print(f"         {j+1}. {option_text} (value: {option_value})")
 
                         if len(options) > 6:
                             print("      最後3個選項:")
-                            for j, option in enumerate(options[-3:], len(options)-2):
+                            for j, option in enumerate(options[-3:], len(options) - 2):
                                 option_text = option.text.strip()
-                                option_value = option.get_attribute('value')
+                                option_value = option.get_attribute("value")
                                 print(f"         {j}. {option_text} (value: {option_value})")
 
                         # 檢查選項是否包含日期相關內容
                         option_texts = [opt.text.strip() for opt in options if opt.text.strip()]
-                        date_keywords = ['202', '2025', '2024', '結算', '期間', '月']
+                        date_keywords = ["202", "2025", "2024", "結算", "期間", "月"]
 
                         # 首先檢查是否只有一個選項且為無資料狀態
                         if len(options) == 1:
                             single_option = options[0]
-                            option_value = single_option.get_attribute('value')
+                            option_value = single_option.get_attribute("value")
                             option_text = single_option.text.strip()
 
                             # 如果只有一個選項且 value="~" 或包含無資料關鍵字
-                            if (option_value == "~" or
-                                any(keyword in option_text for keyword in ['無日期區間可供查詢', '無資料', '沒有資料', '無可用資料', '無日期區間'])):
-                                safe_print(f"   ℹ️ 該帳號只有一個選項且為無資料狀態: '{option_text}' (value: {option_value})")
+                            if option_value == "~" or any(
+                                keyword in option_text
+                                for keyword in ["無日期區間可供查詢", "無資料", "沒有資料", "無可用資料", "無日期區間"]
+                            ):
+                                safe_print(
+                                    f"   ℹ️ 該帳號只有一個選項且為無資料狀態: '{option_text}' (value: {option_value})"
+                                )
                                 safe_print("   ⏭️ 跳過此帳號，沒有可下載的資料")
                                 self.current_settlement_period = None
                                 return "NO_DATA_AVAILABLE"
 
                         # 檢查是否只有「無日期區間可供查詢」或類似的無資料選項
-                        no_data_keywords = ['無日期區間可供查詢', '無資料', '沒有資料', '無可用資料', '無日期區間']
+                        no_data_keywords = ["無日期區間可供查詢", "無資料", "沒有資料", "無可用資料", "無日期區間"]
 
                         # 獲取所有有效的結算區間選項（排除無資料選項和空選項）
                         valid_options = []
                         for opt in options:
                             text = opt.text.strip()
-                            option_value = opt.get_attribute('value')
+                            option_value = opt.get_attribute("value")
 
                             # 排除 value="~" 的選項和包含無資料關鍵字的選項
-                            if (text and option_value != "~" and
-                                not any(keyword in text for keyword in no_data_keywords)):
+                            if (
+                                text
+                                and option_value != "~"
+                                and not any(keyword in text for keyword in no_data_keywords)
+                            ):
                                 # 檢查是否包含有效的日期資訊
                                 if any(keyword in text for keyword in date_keywords):
                                     valid_options.append(opt)
@@ -791,43 +821,43 @@ class PaymentScraper(BaseScraper):
                             return "NO_DATA_AVAILABLE"
 
                         if valid_options:
-                                # 確定實際要下載的期數
-                                actual_periods = min(self.period_number, len(valid_options))
-                                safe_print(f"   📋 找到 {len(valid_options)} 期可用，將下載最新 {actual_periods} 期")
+                            # 確定實際要下載的期數
+                            actual_periods = min(self.period_number, len(valid_options))
+                            safe_print(f"   📋 找到 {len(valid_options)} 期可用，將下載最新 {actual_periods} 期")
 
-                                # 儲存所有要下載的期數資訊
-                                self.periods_to_download = []
-                                for i in range(actual_periods):
-                                    period_option = valid_options[i]
-                                    period_text = period_option.text.strip()
-                                    self.periods_to_download.append({
-                                        'option': period_option,
-                                        'text': period_text,
-                                        'index': i + 1
-                                    })
-                                    safe_print(f"      期數 {i+1}: {period_text}")
+                            # 儲存所有要下載的期數資訊
+                            self.periods_to_download = []
+                            for i in range(actual_periods):
+                                period_option = valid_options[i]
+                                period_text = period_option.text.strip()
+                                self.periods_to_download.append(
+                                    {"option": period_option, "text": period_text, "index": i + 1}
+                                )
+                                safe_print(f"      期數 {i+1}: {period_text}")
 
-                                selected_period = True
-                                # 先選擇第一期作為起始點
-                                try:
-                                    first_valid_index = None
-                                    for idx, opt in enumerate(options):
-                                        if opt.text.strip():
-                                            first_valid_index = idx
-                                            break
-
-                                    if first_valid_index is not None:
-                                        select_obj.select_by_index(first_valid_index)
-                                        time.sleep(2)
-                                        # 獲取選中的選項文字
-                                        selected_option = options[first_valid_index]
-                                        self.current_settlement_period = selected_option.text.strip()
-                                        safe_print(f"   ✅ 已選擇第 {first_valid_index + 1} 期作為起始: {self.current_settlement_period}")
+                            selected_period = True
+                            # 先選擇第一期作為起始點
+                            try:
+                                first_valid_index = None
+                                for idx, opt in enumerate(options):
+                                    if opt.text.strip():
+                                        first_valid_index = idx
                                         break
-                                    else:
-                                        safe_print("   ⚠️ 找到有效選項但無法選擇")
-                                except Exception as select_e:
-                                    safe_print(f"   ❌ 選擇第 1 期失敗: {select_e}")
+
+                                if first_valid_index is not None:
+                                    select_obj.select_by_index(first_valid_index)
+                                    time.sleep(2)
+                                    # 獲取選中的選項文字
+                                    selected_option = options[first_valid_index]
+                                    self.current_settlement_period = selected_option.text.strip()
+                                    safe_print(
+                                        f"   ✅ 已選擇第 {first_valid_index + 1} 期作為起始: {self.current_settlement_period}"
+                                    )
+                                    break
+                                else:
+                                    safe_print("   ⚠️ 找到有效選項但無法選擇")
+                            except Exception as select_e:
+                                safe_print(f"   ❌ 選擇第 1 期失敗: {select_e}")
 
                 except Exception as e:
                     print(f"   處理選單 {i} 失敗: {e}")
@@ -850,6 +880,7 @@ class PaymentScraper(BaseScraper):
         if not period_text:
             safe_print(f"⚠️ 結算期間為空，使用預設檔名")
             from datetime import datetime
+
             # 使用當前日期作為備用檔案名
             current_date = datetime.now().strftime("%Y%m%d")
             return f"unknown_period_{current_date}"
@@ -863,10 +894,10 @@ class PaymentScraper(BaseScraper):
 
             # 支援多種日期格式
             patterns = [
-                r'(\d{4})/(\d{1,2})/(\d{1,2})~(\d{4})/(\d{1,2})/(\d{1,2})',  # 2025/9/4~2025/9/7
-                r'(\d{4})-(\d{1,2})-(\d{1,2})~(\d{4})-(\d{1,2})-(\d{1,2})',  # 2025-9-4~2025-9-7
-                r'(\d{4})年(\d{1,2})月(\d{1,2})日~(\d{4})年(\d{1,2})月(\d{1,2})日',  # 中文格式
-                r'(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})',  # 20250904-20250907
+                r"(\d{4})/(\d{1,2})/(\d{1,2})~(\d{4})/(\d{1,2})/(\d{1,2})",  # 2025/9/4~2025/9/7
+                r"(\d{4})-(\d{1,2})-(\d{1,2})~(\d{4})-(\d{1,2})-(\d{1,2})",  # 2025-9-4~2025-9-7
+                r"(\d{4})年(\d{1,2})月(\d{1,2})日~(\d{4})年(\d{1,2})月(\d{1,2})日",  # 中文格式
+                r"(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})",  # 20250904-20250907
             ]
 
             for pattern in patterns:
@@ -892,14 +923,15 @@ class PaymentScraper(BaseScraper):
             # 如果沒有匹配到日期格式，嘗試其他可能的格式
             safe_print(f"⚠️ 無法解析日期格式，使用安全文字: '{period_text}'")
             # 移除不安全的字符，保留中文、英文、數字、連字號和底線
-            safe_text = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', period_text)
+            safe_text = re.sub(r"[^\w\u4e00-\u9fff\-]", "_", period_text)
             return safe_text
 
         except Exception as e:
             safe_print(f"❌ 格式化結算期間失敗: {e}")
             # 返回安全的檔案名
             import re
-            safe_text = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', str(period_text))
+
+            safe_text = re.sub(r"[^\w\u4e00-\u9fff\-]", "_", str(period_text))
             return safe_text
 
     def download_cod_statement(self):
@@ -926,7 +958,7 @@ class PaymentScraper(BaseScraper):
                 "//input[@type='submit' and contains(@value, '查詢')]",
                 "//a[contains(text(), '查詢')]",
                 "//button[contains(text(), '搜尋')]",
-                "//input[@type='button' and contains(@value, '搜尋')]"
+                "//input[@type='button' and contains(@value, '搜尋')]",
             ]
 
             for selector in query_selectors:
@@ -934,29 +966,30 @@ class PaymentScraper(BaseScraper):
                     elements = self.driver.find_elements(By.XPATH, selector)
                     for elem in elements:
                         if elem.is_displayed() and elem.is_enabled():
-                            query_buttons_found.append({
-                                'element': elem,
-                                'text': elem.text or elem.get_attribute('value'),
-                                'selector': selector
-                            })
+                            query_buttons_found.append(
+                                {
+                                    "element": elem,
+                                    "text": elem.text or elem.get_attribute("value"),
+                                    "selector": selector,
+                                }
+                            )
                 except:
                     continue
 
             # 方法2：尋找所有按鈕，檢查文字內容
             if not query_buttons_found:
-                all_buttons = self.driver.find_elements(By.TAG_NAME, "button") + \
-                             self.driver.find_elements(By.CSS_SELECTOR, "input[type='button'], input[type='submit']")
+                all_buttons = self.driver.find_elements(By.TAG_NAME, "button") + self.driver.find_elements(
+                    By.CSS_SELECTOR, "input[type='button'], input[type='submit']"
+                )
 
                 for button in all_buttons:
                     try:
-                        button_text = button.text or button.get_attribute('value') or ''
-                        if '查詢' in button_text or '搜尋' in button_text or 'query' in button_text.lower():
+                        button_text = button.text or button.get_attribute("value") or ""
+                        if "查詢" in button_text or "搜尋" in button_text or "query" in button_text.lower():
                             if button.is_displayed() and button.is_enabled():
-                                query_buttons_found.append({
-                                    'element': button,
-                                    'text': button_text,
-                                    'selector': 'all_buttons_scan'
-                                })
+                                query_buttons_found.append(
+                                    {"element": button, "text": button_text, "selector": "all_buttons_scan"}
+                                )
                     except:
                         continue
 
@@ -969,7 +1002,7 @@ class PaymentScraper(BaseScraper):
                 "//button[contains(text(), '搜尋')]",
                 "//input[@type='button' and contains(@value, '搜尋')]",
                 "//input[@type='submit' and contains(@value, '搜尋')]",
-                "//a[contains(text(), '搜尋')]"
+                "//a[contains(text(), '搜尋')]",
             ]
 
             for selector in search_selectors:
@@ -977,18 +1010,20 @@ class PaymentScraper(BaseScraper):
                     elements = self.driver.find_elements(By.XPATH, selector)
                     for elem in elements:
                         if elem.is_displayed() and elem.is_enabled():
-                            search_buttons_found.append({
-                                'element': elem,
-                                'text': elem.text or elem.get_attribute('value'),
-                                'selector': selector
-                            })
+                            search_buttons_found.append(
+                                {
+                                    "element": elem,
+                                    "text": elem.text or elem.get_attribute("value"),
+                                    "selector": selector,
+                                }
+                            )
                 except:
                     continue
 
             # 如果沒找到「搜尋」，再找「查詢」
             if not search_buttons_found:
                 for i, btn_info in enumerate(query_buttons_found):
-                    if '搜尋' in btn_info['text']:
+                    if "搜尋" in btn_info["text"]:
                         search_buttons_found.append(btn_info)
 
             # 執行搜尋
@@ -998,7 +1033,7 @@ class PaymentScraper(BaseScraper):
                     try:
                         print(f"   點擊搜尋按鈕: '{btn_info['text']}'")
                         # 使用 JavaScript 點擊以確保成功
-                        self.driver.execute_script("arguments[0].click();", btn_info['element'])
+                        self.driver.execute_script("arguments[0].click();", btn_info["element"])
                         print("   ✅ 搜尋按鈕已點擊，等待 AJAX 載入...")
                         # 智慧等待 AJAX 完成
                         self.smart_wait_for_ajax(timeout=15)  # 等待 AJAX 完成載入
@@ -1013,7 +1048,7 @@ class PaymentScraper(BaseScraper):
                 for i, btn_info in enumerate(query_buttons_found):
                     try:
                         print(f"   點擊查詢按鈕: '{btn_info['text']}'")
-                        self.driver.execute_script("arguments[0].click();", btn_info['element'])
+                        self.driver.execute_script("arguments[0].click();", btn_info["element"])
                         print("   ✅ 查詢按鈕已點擊，等待 AJAX 載入...")
                         # 智慧等待 AJAX 完成
                         self.smart_wait_for_ajax(timeout=15)
@@ -1040,15 +1075,24 @@ class PaymentScraper(BaseScraper):
                 ("xpath", "//input[contains(@value, '對帳單下載')]"),
                 ("xpath", "//a[contains(text(), '下載')]"),
                 ("xpath", "//button[contains(text(), '下載')]"),
-                ("xpath", "//input[contains(@value, '下載')]")
+                ("xpath", "//input[contains(@value, '下載')]"),
             ]
 
             download_buttons_found = []
 
-            # 等待一段時間確保 AJAX 完全載入
+            # 智慧等待下載按鈕元素載入（如果執行了查詢）
             if query_executed:
-                print("   等待 AJAX 內容完全載入...")
-                time.sleep(5)
+                print("   等待下載按鈕載入...")
+                try:
+                    # 等待下載按鈕出現（使用 ID 選擇器優先）
+                    self.smart_wait_for_element(By.ID, "lnkbtnDownload", timeout=10, visible=False)
+                except Exception:
+                    # 如果找不到特定 ID，等待頁面穩定
+                    self.smart_wait(
+                        lambda d: d.execute_script("return document.readyState") == "complete",
+                        timeout=5,
+                        error_message="頁面穩定",
+                    )
 
             for selector_type, selector_value in download_selectors:
                 try:
@@ -1061,14 +1105,16 @@ class PaymentScraper(BaseScraper):
 
                     for element in elements:
                         if element.is_displayed() and element.is_enabled():
-                            element_text = element.text or element.get_attribute('value') or ''
-                            element_id = element.get_attribute('id') or ''
-                            download_buttons_found.append({
-                                'element': element,
-                                'text': element_text,
-                                'id': element_id,
-                                'selector': f"{selector_type}:{selector_value}"
-                            })
+                            element_text = element.text or element.get_attribute("value") or ""
+                            element_id = element.get_attribute("id") or ""
+                            download_buttons_found.append(
+                                {
+                                    "element": element,
+                                    "text": element_text,
+                                    "id": element_id,
+                                    "selector": f"{selector_type}:{selector_value}",
+                                }
+                            )
                             print(f"   找到下載按鈕: '{element_text}' (id: {element_id})")
                 except:
                     continue
@@ -1077,23 +1123,21 @@ class PaymentScraper(BaseScraper):
             if not download_buttons_found:
                 print("   未找到明確的下載按鈕，掃描所有可點擊元素...")
                 all_clickable = (
-                    self.driver.find_elements(By.TAG_NAME, "button") +
-                    self.driver.find_elements(By.TAG_NAME, "a") +
-                    self.driver.find_elements(By.CSS_SELECTOR, "input[type='button'], input[type='submit']")
+                    self.driver.find_elements(By.TAG_NAME, "button")
+                    + self.driver.find_elements(By.TAG_NAME, "a")
+                    + self.driver.find_elements(By.CSS_SELECTOR, "input[type='button'], input[type='submit']")
                 )
 
                 for element in all_clickable:
                     try:
-                        element_text = element.text or element.get_attribute('value') or ''
-                        download_keywords = ['對帳單', '下載', '匯出', 'Excel', 'download', 'export']
+                        element_text = element.text or element.get_attribute("value") or ""
+                        download_keywords = ["對帳單", "下載", "匯出", "Excel", "download", "export"]
 
                         if any(kw in element_text for kw in download_keywords):
                             if element.is_displayed() and element.is_enabled():
-                                download_buttons_found.append({
-                                    'element': element,
-                                    'text': element_text,
-                                    'selector': 'scan_all'
-                                })
+                                download_buttons_found.append(
+                                    {"element": element, "text": element_text, "selector": "scan_all"}
+                                )
                                 print(f"   掃描找到相關按鈕: '{element_text}'")
                     except:
                         continue
@@ -1104,8 +1148,8 @@ class PaymentScraper(BaseScraper):
                 safe_print(f"📥 找到 {len(download_buttons_found)} 個可能的下載按鈕")
 
                 # 優先點擊包含「對帳單」的按鈕
-                priority_buttons = [btn for btn in download_buttons_found if '對帳單' in btn['text']]
-                other_buttons = [btn for btn in download_buttons_found if '對帳單' not in btn['text']]
+                priority_buttons = [btn for btn in download_buttons_found if "對帳單" in btn["text"]]
+                other_buttons = [btn for btn in download_buttons_found if "對帳單" not in btn["text"]]
 
                 all_download_buttons = priority_buttons + other_buttons
 
@@ -1117,7 +1161,7 @@ class PaymentScraper(BaseScraper):
                         files_before = set(self.download_dir.glob("*"))
 
                         # 點擊下載按鈕
-                        self.driver.execute_script("arguments[0].click();", btn_info['element'])
+                        self.driver.execute_script("arguments[0].click();", btn_info["element"])
                         print("   ✅ 下載按鈕已點擊，等待檔案下載...")
 
                         # 檢查是否有瀏覽器下載權限對話框並處理
@@ -1136,7 +1180,8 @@ class PaymentScraper(BaseScraper):
                                 pass  # 沒有alert對話框
 
                             # 方法2：處理Chrome的下載權限UI
-                            self.driver.execute_script("""
+                            self.driver.execute_script(
+                                """
                                 // 自動點擊 "允許" 按鈕
                                 const allowButtons = document.querySelectorAll('button, [role="button"]');
                                 for (const button of allowButtons) {
@@ -1151,16 +1196,15 @@ class PaymentScraper(BaseScraper):
                                         break;
                                     }
                                 }
-                            """)
+                            """
+                            )
                         except Exception as dialog_e:
                             pass  # 忽略對話框處理錯誤
 
                         # 智慧等待下載完成
                         print("   ⏳ 等待檔案下載...")
                         downloaded_files = self.smart_wait_for_file_download(
-                            expected_extension='.xlsx',
-                            timeout=30,
-                            check_interval=0.5
+                            expected_extension=".xlsx", timeout=30, check_interval=0.5
                         )
 
                         if downloaded_files:
@@ -1202,6 +1246,7 @@ class PaymentScraper(BaseScraper):
                         # 即使重命名失敗，也要確保檔案有唯一名稱
                         try:
                             import uuid
+
                             backup_filename = f"客樂得對帳單_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
                             backup_file_path = self.download_dir / backup_filename
                             latest_file.rename(backup_file_path)
@@ -1245,12 +1290,7 @@ class PaymentScraper(BaseScraper):
             login_success = self.login()
             if not login_success:
                 safe_print(f"❌ 帳號 {self.username} 登入失敗")
-                return {
-                    "success": False,
-                    "username": self.username,
-                    "error": "登入失敗",
-                    "downloads": []
-                }
+                return {"success": False, "username": self.username, "error": "登入失敗", "downloads": []}
 
             # 3. 導航到貨到付款查詢頁面
             nav_success = self.navigate_to_payment_query()
@@ -1263,16 +1303,11 @@ class PaymentScraper(BaseScraper):
                         "username": self.username,
                         "error": "密碼安全警告",
                         "error_type": "security_warning",
-                        "downloads": []
+                        "downloads": [],
                     }
                 else:
                     safe_print(f"❌ 帳號 {self.username} 導航失敗")
-                    return {
-                        "success": False,
-                        "username": self.username,
-                        "error": "導航失敗",
-                        "downloads": []
-                    }
+                    return {"success": False, "username": self.username, "error": "導航失敗", "downloads": []}
 
             # 4. 獲取要下載的多期結算期間資訊
             periods_success = self.get_settlement_periods_for_download()
@@ -1282,17 +1317,12 @@ class PaymentScraper(BaseScraper):
                     "success": True,
                     "username": self.username,
                     "message": "沒有可供查詢的日期區間",
-                    "downloads": []
+                    "downloads": [],
                 }
             elif not periods_success:
                 safe_print(f"⚠️ 帳號 {self.username} 未能獲取結算期間資訊")
                 safe_print("⏭️ 無法確定資料可用性，跳過此帳號")
-                return {
-                    "success": True,
-                    "username": self.username,
-                    "message": "未能獲取結算期間資訊",
-                    "downloads": []
-                }
+                return {"success": True, "username": self.username, "message": "未能獲取結算期間資訊", "downloads": []}
             else:
                 # 5. 逐一下載每期的貨到付款匯款明細表
                 safe_print(f"🎯 開始下載 {len(self.periods_to_download)} 期資料...")
@@ -1302,16 +1332,19 @@ class PaymentScraper(BaseScraper):
                         safe_print(f"📅 處理第 {period_info['index']} 期: {period_info['text']}")
 
                         # 選擇當前期數
-                        self.current_settlement_period = period_info['text']
+                        self.current_settlement_period = period_info["text"]
 
                         # 重新選擇期數
                         try:
                             from selenium.webdriver.support.ui import Select
+
                             # 尋找日期選單
                             date_selects = self.driver.find_elements(By.NAME, "ddlDate")
                             if not date_selects:
-                                date_selects = self.driver.find_elements(By.CSS_SELECTOR,
-                                    "select[name*='date'], select[name*='Date'], select[id*='date'], select[id*='Date']")
+                                date_selects = self.driver.find_elements(
+                                    By.CSS_SELECTOR,
+                                    "select[name*='date'], select[name*='Date'], select[id*='date'], select[id*='Date']",
+                                )
 
                             for select_element in date_selects:
                                 select_obj = Select(select_element)
@@ -1319,8 +1352,8 @@ class PaymentScraper(BaseScraper):
 
                                 # 找到對應的選項並選擇
                                 for option in options:
-                                    if option.text.strip() == period_info['text']:
-                                        select_obj.select_by_visible_text(period_info['text'])
+                                    if option.text.strip() == period_info["text"]:
+                                        select_obj.select_by_visible_text(period_info["text"])
                                         time.sleep(2)
                                         safe_print(f"   ✅ 已選擇期數: {period_info['text']}")
                                         break
@@ -1349,7 +1382,7 @@ class PaymentScraper(BaseScraper):
             return {
                 "success": success,
                 "username": self.username,
-                "downloads": [str(f) for f in downloaded_files]  # 轉換 PosixPath 為字串
+                "downloads": [str(f) for f in downloaded_files],  # 轉換 PosixPath 為字串
             }
 
         except Exception as e:
@@ -1358,7 +1391,7 @@ class PaymentScraper(BaseScraper):
                 "success": False,
                 "username": self.username,
                 "error": str(e),
-                "downloads": [str(f) for f in downloaded_files]  # 轉換 PosixPath 為字串
+                "downloads": [str(f) for f in downloaded_files],  # 轉換 PosixPath 為字串
             }
         finally:
             # 結束執行時間計時
@@ -1366,14 +1399,13 @@ class PaymentScraper(BaseScraper):
             self.close()
 
 
-
 def main():
     """主程式入口"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='黑貓宅急便自動下載工具')
-    parser.add_argument('--headless', action='store_true', help='使用無頭模式')
-    parser.add_argument('--period', type=int, default=1, help='指定下載的期數 (1=最新一期, 2=第二新期數, 依此類推)')
+    parser = argparse.ArgumentParser(description="黑貓宅急便自動下載工具")
+    parser.add_argument("--headless", action="store_true", help="使用無頭模式")
+    parser.add_argument("--period", type=int, default=1, help="指定下載的期數 (1=最新一期, 2=第二新期數, 依此類推)")
 
     args = parser.parse_args()
 
@@ -1382,12 +1414,8 @@ def main():
 
         manager = MultiAccountManager("accounts.json")
         # 只有在使用者明確指定 --headless 時才覆蓋設定檔
-        headless_arg = True if '--headless' in sys.argv else None
-        manager.run_all_accounts(
-            PaymentScraper,
-            headless_override=headless_arg,
-            period_number=args.period
-        )
+        headless_arg = True if "--headless" in sys.argv else None
+        manager.run_all_accounts(PaymentScraper, headless_override=headless_arg, period_number=args.period)
 
         return 0
 

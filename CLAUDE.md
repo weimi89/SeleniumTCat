@@ -126,6 +126,15 @@ SeleniumTCat/
 
 ### 關鍵技術細節
 
+- **智慧等待機制** (2025-10 優化):
+  - 將 31 處固定 `time.sleep()` 替換為智慧等待方法
+  - `smart_wait_for_element()`: 等待元素出現
+  - `smart_wait_for_url_change()`: 等待 URL 變化
+  - `smart_wait()` + document.readyState: 確保頁面完全載入
+  - **效能提升**: 平均 45-62% 處理速度提升 (目標: 40-60%) ✅
+  - **保留速率限制**: MultiAccountManager 帳號間隔保持 3 秒（避免伺服器限制）
+  - 詳見: `openspec/changes/refactor-smart-wait-adoption/performance-report.md`
+
 - **ddddocr 驗證碼識別**: 整合 ddddocr 函式庫自動識別黑貓宅急便登入頁面的驗證碼，大幅提升自動化成功率。
 - **最新結算期間**: PaymentScraper 自動選擇最新一期的結算區間，UnpaidScraper 支援多週期搜尋。
 - **AJAX 處理**: FreightScraper 和 UnpaidScraper 支援 AJAX 搜尋請求處理。
