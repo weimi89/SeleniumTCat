@@ -6,7 +6,7 @@ import os
 import time
 
 # 導入共用模組
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 from src.utils.windows_encoding_utils import safe_print, check_pythonunbuffered
 from src.core.base_scraper import BaseScraper
 from src.core.multi_account_manager import MultiAccountManager
@@ -32,7 +32,9 @@ class FreightScraper(BaseScraper):
     繼承自 BaseScraper，複用登入和驗證碼處理功能
     """
 
-    def __init__(self, username, password, headless=False, download_base_dir="downloads", start_date=None, end_date=None):
+    def __init__(
+        self, username, password, headless=False, download_base_dir="downloads", start_date=None, end_date=None
+    ):
         # 呼叫父類建構子
         super().__init__(username, password, headless, download_base_dir)
 
@@ -134,7 +136,7 @@ class FreightScraper(BaseScraper):
                         self.smart_wait_for_url_change(timeout=5)
 
                         # 檢查是否需要重新登入
-                        if 'Login.aspx' in self.driver.current_url:
+                        if "Login.aspx" in self.driver.current_url:
                             safe_print("🔑 需要重新登入...")
                             self.login()
                             self.smart_wait_for_url_change(timeout=10)
@@ -155,13 +157,13 @@ class FreightScraper(BaseScraper):
             # 基於用戶提供的正確 URL 格式，參考 PaymentScraper 的成功模式
             direct_urls = [
                 # 使用 RedirectFunc 的正確方式（基於用戶提供的 FuncNo=166）
-                'https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=166',
+                "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=166",
                 # 其他可能的直接 URL
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=01&TimeOut=N',
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx',
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=01&TimeOut=N",
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx",
                 # 添加更多後備 URL
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=02',
-                'https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=03',
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=02",
+                "https://www.takkyubin.com.tw/YMTContract/aspx/SudaPaymentList.aspx?SudaType=03",
             ]
 
             max_retries = 2  # 每個 URL 最多重試 2 次
@@ -190,7 +192,7 @@ class FreightScraper(BaseScraper):
                         self.smart_wait(
                             lambda d: d.execute_script("return document.readyState") == "complete",
                             timeout=10,
-                            error_message="頁面載入完成"
+                            error_message="頁面載入完成",
                         )
 
                         current_url = self.driver.current_url
@@ -292,16 +294,16 @@ class FreightScraper(BaseScraper):
 
             # 尋找所有可能的帳務選單元素
             all_elements = (
-                self.driver.find_elements(By.TAG_NAME, "a") +
-                self.driver.find_elements(By.TAG_NAME, "div") +
-                self.driver.find_elements(By.TAG_NAME, "span") +
-                self.driver.find_elements(By.TAG_NAME, "td") +
-                self.driver.find_elements(By.TAG_NAME, "li")
+                self.driver.find_elements(By.TAG_NAME, "a")
+                + self.driver.find_elements(By.TAG_NAME, "div")
+                + self.driver.find_elements(By.TAG_NAME, "span")
+                + self.driver.find_elements(By.TAG_NAME, "td")
+                + self.driver.find_elements(By.TAG_NAME, "li")
             )
 
             for element in all_elements:
                 try:
-                    element_text = element.text or element.get_attribute('title') or ''
+                    element_text = element.text or element.get_attribute("title") or ""
                     element_text = element_text.strip()
 
                     if any(keyword in element_text for keyword in accounting_keywords):
@@ -329,11 +331,11 @@ class FreightScraper(BaseScraper):
 
             for link in links:
                 try:
-                    href = link.get_attribute('href') or ''
-                    text = link.text or ''
+                    href = link.get_attribute("href") or ""
+                    text = link.text or ""
 
                     # 優先匹配特定的 URL 模式
-                    if 'RedirectFunc.aspx?FuncNo=166' in href:
+                    if "RedirectFunc.aspx?FuncNo=166" in href:
                         if link.is_displayed() and link.is_enabled():
                             safe_print(f"✅ 找到對帳單明細連結: '{text}' ({href})")
                             link.click()
@@ -362,20 +364,17 @@ class FreightScraper(BaseScraper):
             page_source = self.driver.page_source
 
             # 檢查 URL 是否包含預期的頁面標識
-            url_indicators = [
-                "SudaPaymentList.aspx",
-                "SudaType=01"
-            ]
+            url_indicators = ["SudaPaymentList.aspx", "SudaType=01"]
 
             # 基於真實 HTML 結構的精確內容檢查
             content_indicators = [
                 "速達應付帳款查詢",  # 基於 HTML 中的 lblSudaType
-                "發票日期區間",      # 基於表格標題
-                "txtDateS",         # 開始日期輸入框 ID
-                "txtDateE",         # 結束日期輸入框 ID
-                "btnSearch",        # 搜尋按鈕 ID
-                "客戶帳號",          # 基於表格標題
-                "查詢種類"          # 基於表格標題
+                "發票日期區間",  # 基於表格標題
+                "txtDateS",  # 開始日期輸入框 ID
+                "txtDateE",  # 結束日期輸入框 ID
+                "btnSearch",  # 搜尋按鈕 ID
+                "客戶帳號",  # 基於表格標題
+                "查詢種類",  # 基於表格標題
             ]
 
             url_match = any(indicator in current_url for indicator in url_indicators)
@@ -385,11 +384,7 @@ class FreightScraper(BaseScraper):
             element_check = False
             try:
                 # 檢查關鍵元素是否存在
-                key_elements = [
-                    ("ID", "txtDateS"),
-                    ("ID", "txtDateE"),
-                    ("ID", "btnSearch")
-                ]
+                key_elements = [("ID", "txtDateS"), ("ID", "txtDateE"), ("ID", "btnSearch")]
 
                 found_elements = 0
                 for method, selector in key_elements:
@@ -423,32 +418,22 @@ class FreightScraper(BaseScraper):
             page_source = self.driver.page_source
 
             # 檢查 URL 是否包含會話超時相關的訊息
-            timeout_indicators = [
-                'MsgCenter.aspx',
-                '系統閒置過久',
-                '請重新登入'
-            ]
+            timeout_indicators = ["MsgCenter.aspx", "系統閒置過久", "請重新登入"]
 
             # 檢查 URL - 使用更精確的檢查
             if any(indicator in current_url for indicator in timeout_indicators):
                 return True
 
             # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
-            if 'TimeOut=Y' in current_url:
+            if "TimeOut=Y" in current_url:
                 return True
 
             # 檢查其他 Session 相關但排除正常情況
-            if 'Session' in current_url and 'SessionExpired' in current_url:
+            if "Session" in current_url and "SessionExpired" in current_url:
                 return True
 
             # 檢查頁面內容
-            timeout_messages = [
-                '系統閒置過久',
-                '請重新登入',
-                'Session timeout',
-                'Session expired',
-                '會話超時'
-            ]
+            timeout_messages = ["系統閒置過久", "請重新登入", "Session timeout", "Session expired", "會話超時"]
 
             if any(message in page_source for message in timeout_messages):
                 return True
@@ -482,7 +467,7 @@ class FreightScraper(BaseScraper):
             login_urls = [
                 "https://www.takkyubin.com.tw/YMTContract/Login.aspx",
                 "https://www.takkyubin.com.tw/YMTContract/",
-                "https://www.takkyubin.com.tw/YMTContract/default.aspx"
+                "https://www.takkyubin.com.tw/YMTContract/default.aspx",
             ]
 
             login_success = False
@@ -497,7 +482,7 @@ class FreightScraper(BaseScraper):
                     print(f"   導航後 URL: {current_url}")
 
                     # 檢查是否成功到達登入頁面
-                    if 'Login.aspx' in current_url or '登入' in self.driver.page_source:
+                    if "Login.aspx" in current_url or "登入" in self.driver.page_source:
                         print("   ✅ 成功到達登入頁面")
 
                         # 重新執行登入流程
@@ -685,12 +670,7 @@ class FreightScraper(BaseScraper):
 
         try:
             # 使用智慧等待檢查下載按鈕
-            download_button = self.smart_wait_for_element(
-                By.ID,
-                "btnDownload",
-                timeout=timeout,
-                visible=True
-            )
+            download_button = self.smart_wait_for_element(By.ID, "btnDownload", timeout=timeout, visible=True)
 
             if download_button:
                 safe_print("✅ AJAX 載入完成，下載按鈕已準備就緒")
@@ -724,7 +704,7 @@ class FreightScraper(BaseScraper):
                 backup_selectors = [
                     ("NAME", "btnSearch"),
                     ("VALUE", " 搜尋 "),
-                    ("CSS", "input[type='submit'][value*='搜尋']")
+                    ("CSS", "input[type='submit'][value*='搜尋']"),
                 ]
 
                 for method, selector in backup_selectors:
@@ -786,7 +766,7 @@ class FreightScraper(BaseScraper):
 
                 try:
                     # 步驟 1: 點擊發票編號進入詳細頁面
-                    detail_page_success = self._click_invoice_number(invoice_info['invoice_number'])
+                    detail_page_success = self._click_invoice_number(invoice_info["invoice_number"])
                     if not detail_page_success:
                         safe_print(f"⚠️ 無法進入發票 {invoice_info['invoice_number']} 的詳細頁面，跳過")
                         continue
@@ -911,8 +891,8 @@ class FreightScraper(BaseScraper):
 
             try:
                 # 如果是 JavaScript 連結，需要執行 JavaScript
-                href = download_button.get_attribute('href')
-                if href and 'javascript:' in href:
+                href = download_button.get_attribute("href")
+                if href and "javascript:" in href:
                     # 提取 __doPostBack 參數並執行
                     self.driver.execute_script("arguments[0].click();", download_button)
                 else:
@@ -991,9 +971,7 @@ class FreightScraper(BaseScraper):
 
         # 使用智慧檔案下載等待
         downloaded_files = self.smart_wait_for_file_download(
-            expected_extension='.xlsx',
-            timeout=timeout,
-            check_interval=0.5
+            expected_extension=".xlsx", timeout=timeout, check_interval=0.5
         )
 
         if downloaded_files:
@@ -1040,18 +1018,18 @@ class FreightScraper(BaseScraper):
                         if customer_code and invoice_date and invoice_number:
                             # 轉換日期格式從 2025/08/31 to 20250831
                             try:
-                                date_parts = invoice_date.split('/')
+                                date_parts = invoice_date.split("/")
                                 if len(date_parts) == 3:
                                     formatted_date = f"{date_parts[0]}{date_parts[1].zfill(2)}{date_parts[2].zfill(2)}"
                                 else:
-                                    formatted_date = invoice_date.replace('/', '')
+                                    formatted_date = invoice_date.replace("/", "")
                             except:
-                                formatted_date = invoice_date.replace('/', '')
+                                formatted_date = invoice_date.replace("/", "")
 
                             invoice_info = {
-                                'customer_code': customer_code,
-                                'invoice_date': formatted_date,
-                                'invoice_number': invoice_number
+                                "customer_code": customer_code,
+                                "invoice_date": formatted_date,
+                                "invoice_number": invoice_number,
                             }
                             invoice_data.append(invoice_info)
                             safe_print(f"✅ 解析發票: {customer_code} | {formatted_date} | {invoice_number}")
@@ -1101,6 +1079,7 @@ class FreightScraper(BaseScraper):
                 # 即使重命名失敗，也要確保檔案有唯一名稱
                 try:
                     import uuid
+
                     backup_filename = f"發票明細_{self.username}_{uuid.uuid4().hex[:8]}.xlsx"
                     backup_file_path = file_path.parent / backup_filename
                     file_path.rename(backup_file_path)
@@ -1111,8 +1090,6 @@ class FreightScraper(BaseScraper):
                     renamed_files.append(file_path)  # 最後手段：保留原始檔案
 
         return renamed_files
-
-
 
     def run_full_process(self):
         """執行完整的運費查詢自動化流程"""
@@ -1133,12 +1110,7 @@ class FreightScraper(BaseScraper):
             login_success = self.login()
             if not login_success:
                 safe_print(f"❌ 帳號 {self.username} 登入失敗")
-                return {
-                    "success": False,
-                    "username": self.username,
-                    "error": "登入失敗",
-                    "downloads": []
-                }
+                return {"success": False, "username": self.username, "error": "登入失敗", "downloads": []}
 
             # 3. 導航到對帳單明細頁面
             nav_success = self.navigate_to_freight_query()
@@ -1151,16 +1123,11 @@ class FreightScraper(BaseScraper):
                         "username": self.username,
                         "error": "密碼安全警告",
                         "error_type": "security_warning",
-                        "downloads": []
+                        "downloads": [],
                     }
                 else:
                     safe_print(f"❌ 帳號 {self.username} 導航失敗")
-                    return {
-                        "success": False,
-                        "username": self.username,
-                        "error": "導航失敗",
-                        "downloads": []
-                    }
+                    return {"success": False, "username": self.username, "error": "導航失敗", "downloads": []}
 
             # 4. 設定發票日期區間
             date_success = self.set_invoice_date_range()
@@ -1172,19 +1139,10 @@ class FreightScraper(BaseScraper):
 
             if downloaded_files:
                 safe_print(f"🎉 帳號 {self.username} 運費查詢流程完成！下載了 {len(downloaded_files)} 個檔案")
-                return {
-                    "success": True,
-                    "username": self.username,
-                    "downloads": [str(f) for f in downloaded_files]
-                }
+                return {"success": True, "username": self.username, "downloads": [str(f) for f in downloaded_files]}
             else:
                 safe_print(f"⚠️ 帳號 {self.username} 沒有下載到檔案")
-                return {
-                    "success": True,
-                    "username": self.username,
-                    "message": "無資料可下載",
-                    "downloads": []
-                }
+                return {"success": True, "username": self.username, "message": "無資料可下載", "downloads": []}
 
         except Exception as e:
             safe_print(f"💥 帳號 {self.username} 流程執行失敗: {e}")
@@ -1192,7 +1150,7 @@ class FreightScraper(BaseScraper):
                 "success": False,
                 "username": self.username,
                 "error": str(e),
-                "downloads": [str(f) for f in downloaded_files]
+                "downloads": [str(f) for f in downloaded_files],
             }
         finally:
             # 結束執行時間計時
@@ -1204,10 +1162,10 @@ def main():
     """主程式入口"""
     import argparse
 
-    parser = argparse.ArgumentParser(description='黑貓宅急便運費查詢自動下載工具')
-    parser.add_argument('--headless', action='store_true', help='使用無頭模式')
-    parser.add_argument('--start-date', type=str, help='開始日期 (格式: YYYYMMDD)')
-    parser.add_argument('--end-date', type=str, help='結束日期 (格式: YYYYMMDD)')
+    parser = argparse.ArgumentParser(description="黑貓宅急便運費查詢自動下載工具")
+    parser.add_argument("--headless", action="store_true", help="使用無頭模式")
+    parser.add_argument("--start-date", type=str, help="開始日期 (格式: YYYYMMDD)")
+    parser.add_argument("--end-date", type=str, help="結束日期 (格式: YYYYMMDD)")
 
     args = parser.parse_args()
 
@@ -1216,12 +1174,9 @@ def main():
 
         manager = MultiAccountManager("accounts.json")
         # 只有在使用者明確指定 --headless 時才覆蓋設定檔
-        headless_arg = True if '--headless' in sys.argv else None
+        headless_arg = True if "--headless" in sys.argv else None
         manager.run_all_accounts(
-            FreightScraper,
-            headless_override=headless_arg,
-            start_date=args.start_date,
-            end_date=args.end_date
+            FreightScraper, headless_override=headless_arg, start_date=args.start_date, end_date=args.end_date
         )
 
         return 0

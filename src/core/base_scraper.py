@@ -92,11 +92,7 @@ class BaseScraper:
             )
         """
         try:
-            return WebDriverWait(
-                self.driver,
-                timeout,
-                poll_frequency=poll_frequency
-            ).until(condition)
+            return WebDriverWait(self.driver, timeout, poll_frequency=poll_frequency).until(condition)
         except Exception as e:
             safe_print(f"⚠️ {error_message}: {e}")
             return None
@@ -116,9 +112,7 @@ class BaseScraper:
             old_url = self.driver.current_url
 
         try:
-            WebDriverWait(self.driver, timeout).until(
-                lambda d: d.current_url != old_url
-            )
+            WebDriverWait(self.driver, timeout).until(lambda d: d.current_url != old_url)
             safe_print(f"✅ URL 已變化: {old_url} → {self.driver.current_url}")
             return True
         except:
@@ -140,13 +134,9 @@ class BaseScraper:
         """
         try:
             if visible:
-                element = WebDriverWait(self.driver, timeout).until(
-                    EC.visibility_of_element_located((by, value))
-                )
+                element = WebDriverWait(self.driver, timeout).until(EC.visibility_of_element_located((by, value)))
             else:
-                element = WebDriverWait(self.driver, timeout).until(
-                    EC.presence_of_element_located((by, value))
-                )
+                element = WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, value)))
             return element
         except:
             safe_print(f"⚠️ 在 {timeout} 秒內未找到元素: {by}={value}")
@@ -165,9 +155,7 @@ class BaseScraper:
             可點擊的元素或 None
         """
         try:
-            element = WebDriverWait(self.driver, timeout).until(
-                EC.element_to_be_clickable((by, value))
-            )
+            element = WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
             return element
         except:
             safe_print(f"⚠️ 在 {timeout} 秒內元素未變為可點擊: {by}={value}")
@@ -219,17 +207,11 @@ class BaseScraper:
             files = list(self.download_dir.glob("*"))
 
             # 排除臨時檔案（.crdownload, .tmp）
-            valid_files = [
-                f for f in files
-                if f.suffix.lower() not in ['.crdownload', '.tmp', '.part']
-            ]
+            valid_files = [f for f in files if f.suffix.lower() not in [".crdownload", ".tmp", ".part"]]
 
             # 如果指定了副檔名，進一步過濾
             if expected_extension:
-                valid_files = [
-                    f for f in valid_files
-                    if f.suffix.lower() == expected_extension.lower()
-                ]
+                valid_files = [f for f in valid_files if f.suffix.lower() == expected_extension.lower()]
 
             if valid_files:
                 # 找到新檔案
@@ -257,8 +239,7 @@ class BaseScraper:
         default_download_dir = self.final_download_dir
 
         self.driver, self.wait = init_chrome_browser(
-            headless=self.headless,
-            download_dir=str(default_download_dir.absolute())
+            headless=self.headless, download_dir=str(default_download_dir.absolute())
         )
 
     def solve_captcha(self, captcha_img_element):
@@ -328,9 +309,7 @@ class BaseScraper:
 
         try:
             # 填入使用者帳號
-            username_field = self.wait.until(
-                EC.presence_of_element_located((By.ID, "txtUserID"))
-            )
+            username_field = self.wait.until(EC.presence_of_element_located((By.ID, "txtUserID")))
             username_field.clear()
             username_field.send_keys(self.username)
             safe_print(f"✅ 已填入使用者帳號: {self.username}")
@@ -372,7 +351,7 @@ class BaseScraper:
                     (By.ID, "txtCaptcha"),
                     (By.NAME, "txtCaptcha"),
                     (By.CSS_SELECTOR, "input[placeholder*='驗證']"),
-                    (By.CSS_SELECTOR, "input[type='text']:nth-of-type(2)")
+                    (By.CSS_SELECTOR, "input[type='text']:nth-of-type(2)"),
                 ]
 
                 captcha_field = None
@@ -408,7 +387,7 @@ class BaseScraper:
                 (By.ID, "rdoLoginType_1"),
                 (By.NAME, "IsCustService"),
                 (By.CSS_SELECTOR, "input[type='radio'][value='1']"),
-                (By.CSS_SELECTOR, "input[type='radio']:nth-of-type(2)")
+                (By.CSS_SELECTOR, "input[type='radio']:nth-of-type(2)"),
             ]
 
             contract_radio = None
@@ -453,7 +432,7 @@ class BaseScraper:
             # 檢查是否有Alert彈窗 - 使用統一的處理方式
             try:
                 # 如果子類別有 _handle_alerts 方法，使用它
-                if hasattr(self, '_handle_alerts'):
+                if hasattr(self, "_handle_alerts"):
                     alert_result = self._handle_alerts()
                     if alert_result == "SECURITY_WARNING":
                         safe_print("🚨 登入後遇到密碼安全警告，終止當前帳號處理")
@@ -494,7 +473,7 @@ class BaseScraper:
                 "//div[contains(text(), '失敗')]",
                 "//span[contains(text(), '失敗')]",
                 "//div[contains(text(), '驗證碼')]",
-                "//span[contains(text(), '驗證碼')]"
+                "//span[contains(text(), '驗證碼')]",
             ]
 
             for selector in error_selectors:
@@ -524,13 +503,29 @@ class BaseScraper:
         # 檢查頁面內容是否包含登入成功的跡象
         page_source = self.driver.page_source
         success_indicators = [
-            "登出", "系統主選單", "歡迎", "功能選單", "查詢", "報表", "主頁", "首頁",
-            "logout", "menu", "welcome", "main", "dashboard"
+            "登出",
+            "系統主選單",
+            "歡迎",
+            "功能選單",
+            "查詢",
+            "報表",
+            "主頁",
+            "首頁",
+            "logout",
+            "menu",
+            "welcome",
+            "main",
+            "dashboard",
         ]
 
         failure_indicators = [
-            "帳號或密碼錯誤", "驗證碼錯誤", "登入失敗", "帳號不存在",
-            "密碼錯誤", "驗證失敗", "請重新登入"
+            "帳號或密碼錯誤",
+            "驗證碼錯誤",
+            "登入失敗",
+            "帳號不存在",
+            "密碼錯誤",
+            "驗證失敗",
+            "請重新登入",
         ]
 
         # 檢查失敗指標
@@ -595,10 +590,10 @@ class BaseScraper:
         if self.start_time and self.end_time:
             return {
                 "username": self.username,
-                "start_time": self.start_time.strftime('%Y-%m-%d %H:%M:%S'),
-                "end_time": self.end_time.strftime('%Y-%m-%d %H:%M:%S'),
+                "start_time": self.start_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "end_time": self.end_time.strftime("%Y-%m-%d %H:%M:%S"),
                 "duration_minutes": round(self.execution_duration_minutes, 2),
-                "security_warning": self.security_warning_encountered
+                "security_warning": self.security_warning_encountered,
             }
         else:
             return {
@@ -606,16 +601,15 @@ class BaseScraper:
                 "start_time": None,
                 "end_time": None,
                 "duration_minutes": 0,
-                "security_warning": self.security_warning_encountered
+                "security_warning": self.security_warning_encountered,
             }
 
     def set_download_directory(self, download_path):
         """動態設定 Chrome 下載目錄"""
         try:
-            self.driver.execute_cdp_cmd('Page.setDownloadBehavior', {
-                'behavior': 'allow',
-                'downloadPath': str(download_path.absolute())
-            })
+            self.driver.execute_cdp_cmd(
+                "Page.setDownloadBehavior", {"behavior": "allow", "downloadPath": str(download_path.absolute())}
+            )
             safe_print(f"✅ 已設定下載目錄: {download_path}")
             return True
         except Exception as e:
@@ -628,12 +622,13 @@ class BaseScraper:
         如果瀏覽器已啟動，會動態設定下載目錄
         """
         import uuid
+
         temp_uuid = str(uuid.uuid4())
         self.download_dir = Path("temp") / temp_uuid
         self.download_dir.mkdir(parents=True, exist_ok=True)
 
         # 如果瀏覽器已經啟動，動態設定下載目錄
-        if hasattr(self, 'driver') and self.driver:
+        if hasattr(self, "driver") and self.driver:
             self.set_download_directory(self.download_dir)
 
         safe_print(f"📁 建立臨時下載目錄: {self.download_dir}")
@@ -662,6 +657,7 @@ class BaseScraper:
 
         try:
             import shutil
+
             safe_print(f"📁 移動檔案從臨時目錄 {self.download_dir} 到 {self.final_download_dir}")
 
             for renamed_file in renamed_files:
@@ -698,6 +694,7 @@ class BaseScraper:
         try:
             if temp_dir.exists():
                 import shutil
+
                 shutil.rmtree(temp_dir)
                 safe_print(f"🗑️ 已清理臨時目錄: {temp_dir}")
         except Exception as e:
