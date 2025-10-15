@@ -16,6 +16,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 # 導入 Windows 編碼處理工具
 from ..utils.windows_encoding_utils import safe_print
 
+
 def init_chrome_browser(headless=False, download_dir=None):
     """
     初始化 Chrome 瀏覽器
@@ -43,8 +44,8 @@ def init_chrome_browser(headless=False, download_dir=None):
     chrome_options.add_argument("--disable-gpu-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--remote-debugging-port=0")  # 隱藏 DevTools listening 訊息
-    chrome_options.add_experimental_option('excludeSwitches', ['enable-logging'])
-    chrome_options.add_experimental_option('useAutomationExtension', False)
+    chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+    chrome_options.add_experimental_option("useAutomationExtension", False)
 
     # 設定自動下載權限，避免下載多個檔案時的權限提示
     chrome_options.add_argument("--disable-features=VizDisplayCompositor")
@@ -61,7 +62,7 @@ def init_chrome_browser(headless=False, download_dir=None):
         safe_print("🖥️ 使用視窗模式（顯示瀏覽器）")
 
     # 從環境變數讀取 Chrome 路徑（跨平台設定）
-    chrome_binary_path = os.getenv('CHROME_BINARY_PATH')
+    chrome_binary_path = os.getenv("CHROME_BINARY_PATH")
     if chrome_binary_path:
         chrome_options.binary_location = chrome_binary_path
         safe_print(f"🌐 使用指定 Chrome 路徑: {chrome_binary_path}")
@@ -76,7 +77,7 @@ def init_chrome_browser(headless=False, download_dir=None):
             "download.directory_upgrade": True,
             "safebrowsing.enabled": True,
             "profile.default_content_setting_values.automatic_downloads": 1,  # 允許多個檔案自動下載
-            "profile.content_settings.exceptions.automatic_downloads.*.setting": 1  # 允許自動下載
+            "profile.content_settings.exceptions.automatic_downloads.*.setting": 1,  # 允許自動下載
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
@@ -84,7 +85,7 @@ def init_chrome_browser(headless=False, download_dir=None):
     driver = None
 
     # 方法1: 嘗試使用 .env 中設定的 ChromeDriver 路徑
-    chromedriver_path = os.getenv('CHROMEDRIVER_PATH')
+    chromedriver_path = os.getenv("CHROMEDRIVER_PATH")
     if chromedriver_path and os.path.exists(chromedriver_path):
         try:
             service = Service(chromedriver_path)
@@ -115,7 +116,8 @@ def init_chrome_browser(headless=False, download_dir=None):
         try:
             # 抑制 ChromeDriverManager 的輸出
             import logging
-            logging.getLogger('WDM').setLevel(logging.WARNING)
+
+            logging.getLogger("WDM").setLevel(logging.WARNING)
 
             service = Service(ChromeDriverManager().install())
             driver = webdriver.Chrome(service=service, options=chrome_options)
