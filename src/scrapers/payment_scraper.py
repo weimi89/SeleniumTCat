@@ -658,7 +658,12 @@ class PaymentScraper(BaseScraper):
 
                     # 回到首頁
                     self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
-                    time.sleep(3)
+                    # 智慧等待頁面載入完成
+                    self.smart_wait(
+                        lambda d: d.execute_script("return document.readyState") == "complete",
+                        timeout=10,
+                        message="首頁載入完成"
+                    )
 
                     # 再次嘗試登入
                     final_login_success = self.login()
