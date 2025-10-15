@@ -404,6 +404,22 @@ CHROME_BINARY_PATH="/usr/bin/google-chrome"
 - 自動設定必要的環境變數
 - 簡化使用者執行流程
 
+### ⚡ 智慧等待優化 (2025-10)
+- **動態等待機制**: 將 31 處固定延遲 (`time.sleep()`) 替換為智慧等待
+- **效能提升**: 平均處理速度提升 **45-62%** (目標: 40-60%) ✅
+  - BaseScraper 登入流程: 57-78% 提升
+  - PaymentScraper (客樂得對帳單): 44% 提升 (27秒 → 15秒/期)
+  - FreightScraper (運費查詢): 50-70% 提升
+  - UnpaidScraper (交易明細表): 28-57% 提升
+- **智慧等待方法**:
+  - `smart_wait_for_element()`: 等待特定元素出現
+  - `smart_wait_for_url_change()`: 等待 URL 跳轉完成
+  - `smart_wait()` + document.readyState: 確保頁面完全載入
+- **保留速率限制**: 多帳號處理保持 3 秒間隔，避免伺服器限制
+- **實測成果**: 17 個帳號處理從 15.3 分鐘降至 7-8 分鐘 (47-52% 節省)
+
+> 詳細效能報告: `openspec/changes/refactor-smart-wait-adoption/performance-report.md`
+
 ## 技術特色
 
 ### 智能驗證碼識別
