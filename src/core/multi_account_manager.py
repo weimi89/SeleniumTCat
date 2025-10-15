@@ -35,7 +35,7 @@ class MultiAccountManager:
             )
 
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
+            with open(self.config_file, "r", encoding="utf-8") as f:
                 self.config = json.load(f)
 
             if "accounts" not in self.config or not self.config["accounts"]:
@@ -102,7 +102,7 @@ class MultiAccountManager:
                     "username": username,
                     "password": password,
                     "headless": use_headless,
-                    "download_base_dir": settings.get("download_base_dir", "downloads")
+                    "download_base_dir": settings.get("download_base_dir", "downloads"),
                 }
 
                 # 合併額外的 scraper 參數
@@ -127,12 +127,7 @@ class MultiAccountManager:
 
             except Exception as e:
                 safe_print(f"💥 帳號 {username} 處理失敗: {e}")
-                results.append({
-                    "success": False,
-                    "username": username,
-                    "error": str(e),
-                    "downloads": []
-                })
+                results.append({"success": False, "username": username, "error": str(e), "downloads": []})
                 continue
 
         # 結束總執行時間計時
@@ -166,7 +161,7 @@ class MultiAccountManager:
         if security_warning_accounts:
             print(f"   密碼安全警告: {len(security_warning_accounts)}")
         print(f"   總下載檔案: {total_downloads}")
-        if hasattr(self, 'total_execution_minutes') and self.total_execution_minutes > 0:
+        if hasattr(self, "total_execution_minutes") and self.total_execution_minutes > 0:
             print(f"   總執行時長: {self.total_execution_minutes:.2f} 分鐘")
 
         if successful_accounts:
@@ -179,7 +174,9 @@ class MultiAccountManager:
                 if result.get("message") == "無資料可下載":
                     safe_print(f"   🔸 {username}: 無資料可下載 (執行時間: {duration_minutes:.2f} 分鐘)")
                 else:
-                    safe_print(f"   🔸 {username}: 成功下載 {download_count} 個檔案 (執行時間: {duration_minutes:.2f} 分鐘)")
+                    safe_print(
+                        f"   🔸 {username}: 成功下載 {download_count} 個檔案 (執行時間: {duration_minutes:.2f} 分鐘)"
+                    )
 
                 # 顯示期間詳細資訊（如果有的話）
                 period_details = result.get("period_details", [])
@@ -193,7 +190,9 @@ class MultiAccountManager:
                         file_count = len(detail["files"])
 
                         if status == "success":
-                            safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ✅ 成功下載 {file_count} 個檔案")
+                            safe_print(
+                                f"         第 {period} 期 ({start_date}-{end_date}): ✅ 成功下載 {file_count} 個檔案"
+                            )
                         elif status == "no_records":
                             safe_print(f"         第 {period} 期 ({start_date}-{end_date}): ⚠️ 無交易記錄")
                         elif status == "search_failed":
@@ -239,7 +238,7 @@ class MultiAccountManager:
                 "records": len(result.get("records", [])) if result.get("records") else 0,
                 "duration_minutes": result.get("duration_minutes", 0),
                 "start_time": result.get("start_time"),
-                "end_time": result.get("end_time")
+                "end_time": result.get("end_time"),
             }
             if "error" in result:
                 clean_result["error"] = result["error"]
@@ -249,19 +248,30 @@ class MultiAccountManager:
                 clean_result["message"] = result["message"]
             clean_results.append(clean_result)
 
-        with open(report_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                "execution_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "total_start_time": self.total_start_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_start_time else None,
-                "total_end_time": self.total_end_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_end_time else None,
-                "total_execution_minutes": round(self.total_execution_minutes, 2) if hasattr(self, 'total_execution_minutes') else 0,
-                "total_accounts": len(results),
-                "successful_accounts": len(successful_accounts),
-                "failed_accounts": len(other_failed_accounts),
-                "security_warning_accounts": len(security_warning_accounts),
-                "total_downloads": total_downloads,
-                "details": clean_results
-            }, f, ensure_ascii=False, indent=2)
+        with open(report_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "execution_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "total_start_time": (
+                        self.total_start_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_start_time else None
+                    ),
+                    "total_end_time": (
+                        self.total_end_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_end_time else None
+                    ),
+                    "total_execution_minutes": (
+                        round(self.total_execution_minutes, 2) if hasattr(self, "total_execution_minutes") else 0
+                    ),
+                    "total_accounts": len(results),
+                    "successful_accounts": len(successful_accounts),
+                    "failed_accounts": len(other_failed_accounts),
+                    "security_warning_accounts": len(security_warning_accounts),
+                    "total_downloads": total_downloads,
+                    "details": clean_results,
+                },
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
 
         safe_print(f"\n💾 詳細報告已保存: {report_file}")
         print("=" * 80)
