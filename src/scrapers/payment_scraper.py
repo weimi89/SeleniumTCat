@@ -55,7 +55,7 @@ class PaymentScraper(BaseScraper):
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
-                time.sleep(3)  # 間隔時間
+                # 移除固定等待，後續的智慧等待已足夠
 
             try:
                 # 智慧等待登入完成 - URL 不再是 Login.aspx
