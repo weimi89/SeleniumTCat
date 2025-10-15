@@ -51,7 +51,7 @@ class UnpaidScraper(BaseScraper):
         for attempt in range(max_attempts):
             if attempt > 0:
                 safe_print(f"🔄 第 {attempt + 1} 次嘗試導航...")
-                time.sleep(1)  # 短暫間隔
+                # 移除固定等待，後續的智慧等待已足夠
 
             try:
                 # 智慧等待登入完成
@@ -155,7 +155,8 @@ class UnpaidScraper(BaseScraper):
 
                     try:
                         self.driver.get(full_url)
-                        time.sleep(1)  # 短暫等待以檢測 alert
+                        # 短暫等待以檢測 alert（保留此處固定等待，因 alert 檢測需要）
+                        time.sleep(0.5)
 
                         # 處理可能的 alert 彈窗
                         alert_result = self._handle_alerts()
@@ -165,7 +166,12 @@ class UnpaidScraper(BaseScraper):
                         elif alert_result:
                             print("   🔔 處理了安全提示或其他彈窗")
 
-                        self.smart_wait(1)  # 等待頁面穩定
+                        # 智慧等待頁面完全載入（document.readyState == 'complete'）
+                        self.smart_wait(
+                            lambda d: d.execute_script("return document.readyState") == "complete",
+                            timeout=10,
+                            error_message="頁面載入完成"
+                        )
 
                         current_url = self.driver.current_url
                         print(f"   導航後 URL: {current_url}")
@@ -177,7 +183,12 @@ class UnpaidScraper(BaseScraper):
                                 print("   ✅ 重新登入成功，重試導航...")
                                 # 重新嘗試當前 URL
                                 self.driver.get(full_url)
-                                self.smart_wait(1)
+                                # 智慧等待頁面完全載入
+                                self.smart_wait(
+                                    lambda d: d.execute_script("return document.readyState") == "complete",
+                                    timeout=10,
+                                    error_message="重新登入後頁面載入完成"
+                                )
                                 current_url = self.driver.current_url
                             else:
                                 print("   ❌ 重新登入失敗")
@@ -192,7 +203,8 @@ class UnpaidScraper(BaseScraper):
 
                         # 如果這次嘗試失敗，但還有重試機會，則稍等片刻再重試
                         if retry < max_retries:
-                            time.sleep(1)
+                            # 移除固定等待，直接重試
+                            pass
                         else:
                             break  # 跳出重試循環，嘗試下一個 URL
 
@@ -208,7 +220,8 @@ class UnpaidScraper(BaseScraper):
                                 return False  # 終止當前帳號處理
 
                         if retry < max_retries:
-                            time.sleep(2)
+                            # 短暫等待後重試（alert 處理後需要一些時間穩定）
+                            time.sleep(0.5)
                         continue
 
             print("   ❌ 所有直接 URL 嘗試都失敗")
