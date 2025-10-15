@@ -74,6 +74,8 @@ venv.bak/
 
 # 帳號憑證和本地設定（保留範例檔案）
 accounts.json
+accounts.json.backup
+accounts*.json
 !accounts.json.example
 
 # 本地設定檔案
