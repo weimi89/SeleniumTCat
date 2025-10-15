@@ -441,10 +441,11 @@ class BaseScraper:
         try:
             # 找到登入按鈕並點擊
             login_button = self.driver.find_element(By.CSS_SELECTOR, 'input[type="submit"]')
+            old_url = self.driver.current_url
             login_button.click()
 
-            # 等待頁面載入並處理可能的Alert
-            time.sleep(5)  # 增加等待時間
+            # 智慧等待頁面響應（URL變化或頁面載入完成）
+            self.smart_wait_for_url_change(old_url=old_url, timeout=10)
 
             # 檢查是否有錯誤訊息在頁面上
             self._check_error_messages()
