@@ -116,10 +116,10 @@
 
 ---
 
-## 6. MultiAccountManager 檢視
-- [ ] 6.1 **檢視** `multi_account_manager.py:124` 帳號間隔等待
-- [ ] 6.2 **決定** - 保留此處 `time.sleep(3)`（避免請求過於頻繁）
-- [ ] 6.3 **添加註解** - 說明保留原因
+## 6. MultiAccountManager 檢視 ✅ **已完成**
+- [x] 6.1 **檢視** `multi_account_manager.py:124` 帳號間隔等待 ✅
+- [x] 6.2 **決定** - 保留此處 `time.sleep(3)`（避免請求過於頻繁）✅
+- [x] 6.3 **添加註解** - 說明保留原因 ✅ 添加詳細註解說明速率限制
 
 ---
 
