@@ -287,7 +287,8 @@ class BaseScraper:
 
             # 前往登入頁面
             self.driver.get(self.url)
-            time.sleep(2)
+            # 智慧等待登入表單載入完成
+            self.smart_wait_for_element(By.ID, "txtUserID", timeout=10, visible=True)
             safe_print("✅ 登入頁面載入完成")
 
             # 填寫表單
