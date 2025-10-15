@@ -118,7 +118,9 @@ class MultiAccountManager:
 
                 results.append(result)
 
-                # 帳號間暫停一下避免過於頻繁
+                # 帳號間隔等待 (保留此處固定等待)
+                # 原因: 避免連續請求過於頻繁導致伺服器限制或封鎖
+                # 此等待是有意的速率限制 (rate limiting)，不應優化移除
                 if i < len(accounts):
                     safe_print("⏳ 等待 3 秒後處理下一個帳號...")
                     time.sleep(3)
