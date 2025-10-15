@@ -465,7 +465,12 @@ class PaymentScraper(BaseScraper):
                     elif alert_result:
                         print("   🔔 處理了安全提示或其他彈窗")
 
-                    time.sleep(3)  # 等待頁面完全載入
+                    # 智慧等待頁面完全載入（document.readyState == 'complete'）
+                    self.smart_wait(
+                        lambda d: d.execute_script("return document.readyState") == "complete",
+                        timeout=10,
+                        message="頁面載入完成"
+                    )
 
                     current_url = self.driver.current_url
                     page_source = self.driver.page_source
