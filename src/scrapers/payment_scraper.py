@@ -719,8 +719,12 @@ class PaymentScraper(BaseScraper):
         safe_print(f"📅 準備下載最新 {self.period_number} 期結算區間...")
 
         try:
-            # 等待頁面載入
-            time.sleep(3)
+            # 智慧等待頁面載入完成
+            self.smart_wait(
+                lambda d: d.execute_script("return document.readyState") == "complete",
+                timeout=10,
+                message="結算期間頁面載入完成"
+            )
 
             # 專門尋找 ddlDate 選單
             date_selects = self.driver.find_elements(By.NAME, "ddlDate")
