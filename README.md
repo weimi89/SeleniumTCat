@@ -349,11 +349,19 @@ temp/                 # 暫存檔案
 
 > **安全提醒**：請參考 `accounts.json.example` 建立此檔案，切勿將真實密碼提交到版本控制系統。
 
+**新格式**（推薦，純陣列格式）：
+```json
+[
+  {"username": "0000000063", "password": "your_password", "enabled": true},
+  {"username": "0000000013", "password": "your_password", "enabled": false}
+]
+```
+
+**舊格式**（仍支援，但會顯示警告）：
 ```json
 {
   "accounts": [
-    {"username": "0000000063", "password": "your_password", "enabled": true},
-    {"username": "0000000013", "password": "your_password", "enabled": false}
+    {"username": "0000000063", "password": "your_password", "enabled": true}
   ],
   "settings": {
     "headless": false,
@@ -362,14 +370,23 @@ temp/                 # 暫存檔案
 }
 ```
 
+> **配置遷移提醒**：舊的 `settings` 設定已移至 `.env` 檔案管理，請參考下方 `.env` 設定說明。舊格式仍支援但 `settings` 會被忽略。
+
 **重要設定說明**：
 - `enabled: true/false` - 控制要處理哪些帳號
-- `headless: true/false` - 是否使用背景模式（無法手動輸入驗證碼）
 - 已加入 `.gitignore`，不會意外提交敏感資訊
 
 ### .env
-設定 Chrome 瀏覽器路徑：
+環境設定檔（⚠️ 此檔案不會被 Git 追蹤）：
+
+> **設定提醒**：請參考 `.env.example` 建立此檔案，設定 Chrome 路徑和其他環境變數。
+
+**基本設定**：
 ```bash
+# ═══════════════════════════════════════════════════════════════
+# Chrome/Chromium 瀏覽器路徑設定
+# ═══════════════════════════════════════════════════════════════
+
 # macOS
 CHROME_BINARY_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
@@ -378,7 +395,42 @@ CHROME_BINARY_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"
 
 # Linux
 CHROME_BINARY_PATH="/usr/bin/google-chrome"
+
+# ═══════════════════════════════════════════════════════════════
+# 瀏覽器模式設定
+# ═══════════════════════════════════════════════════════════════
+# 預設值：true（無頭模式，不顯示瀏覽器視窗）
+# 可選值：true（無頭模式）/ false（顯示瀏覽器視窗）
+
+HEADLESS=true
+
+# ═══════════════════════════════════════════════════════════════
+# 下載目錄設定
+# ═══════════════════════════════════════════════════════════════
+# 預設值：所有檔案下載到 downloads/ 目錄
+# 注意：只有需要自訂路徑時才需要設定
+
+# 貨到付款匯款明細下載目錄
+PAYMENT_DOWNLOAD_DIR=downloads
+
+# 運費發票明細下載目錄
+FREIGHT_DOWNLOAD_DIR=downloads
+
+# 交易明細表下載目錄
+UNPAID_DOWNLOAD_DIR=downloads
 ```
+
+**配置優先級**：
+1. 命令列參數（如 `--headless`）
+2. 環境變數（`.env` 檔案）
+3. 預設值
+
+**環境變數說明**：
+- `CHROME_BINARY_PATH` - Chrome 瀏覽器執行檔路徑
+- `HEADLESS` - 是否使用無頭模式（`true`/`false`）
+- `PAYMENT_DOWNLOAD_DIR` - 貨到付款檔案下載目錄
+- `FREIGHT_DOWNLOAD_DIR` - 運費發票檔案下載目錄
+- `UNPAID_DOWNLOAD_DIR` - 交易明細檔案下載目錄
 
 ## 現代化特色
 

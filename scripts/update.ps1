@@ -33,7 +33,7 @@ try {
     Write-Host "🔍 檢查工作目錄狀態..." -ForegroundColor Blue
     $gitStatus = git status --porcelain
     if ($gitStatus) {
-        Write-Host "⚠️  警告: 發現未提交的變更" -ForegroundColor Yellow
+        Write-Host "⚠️ 警告: 發現未提交的變更" -ForegroundColor Yellow
         Write-Host ""
         Write-Host "未提交的檔案:" -ForegroundColor Yellow
         git status --porcelain
