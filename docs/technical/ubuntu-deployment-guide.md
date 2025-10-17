@@ -363,7 +363,50 @@ sudo apt update
 sudo apt install -y chromium-browser chromium-chromedriver
 ```
 
-### 問題 3：ddddocr 無法載入
+### 問題 3：Pillow 編譯失敗 (zlib 相關錯誤)
+
+**錯誤訊息**：
+```
+× Failed to build `pillow==9.5.0`
+RequiredDependencyException: zlib
+The headers or library files could not be found for zlib
+```
+
+**原因**：
+- Pillow 9.5.0 沒有 Python 3.12 的預編譯 wheel
+- 需要從源碼編譯，但缺少系統級依賴
+
+**解決方案**：
+
+安裝完整的 Pillow 編譯依賴：
+
+```bash
+# 安裝所有必要的編譯依賴
+sudo apt update
+sudo apt install -y \
+    build-essential \
+    python3-dev \
+    zlib1g-dev \
+    libjpeg-dev \
+    libtiff-dev \
+    libfreetype6-dev \
+    liblcms2-dev \
+    libwebp-dev \
+    libopenjp2-7-dev
+
+# 重新安裝 Python 依賴
+cd /path/to/SeleniumTCat
+uv sync --reinstall-package pillow
+
+# 驗證安裝
+uv run python -c "from PIL import Image; print(f'Pillow {Image.__version__} 安裝成功')"
+```
+
+**注意**：`scripts/install.sh` 已自動包含這些依賴的安裝，建議使用自動化腳本部署。
+
+參考：`ubuntu-system-dependencies.txt` 查看完整依賴清單
+
+### 問題 4：ddddocr 無法載入
 
 **錯誤訊息**：
 ```
@@ -377,17 +420,23 @@ sudo apt install -y chromium-browser chromium-chromedriver
    ls -la .venv
    ```
 
-2. 重新安裝依賴：
+2. 檢查 Pillow 是否正確安裝（ddddocr 依賴 Pillow）：
+   ```bash
+   uv run python -c "from PIL import Image; print('Pillow OK')"
+   ```
+   如果失敗，請參考「問題 3：Pillow 編譯失敗」
+
+3. 重新安裝依賴：
    ```bash
    uv sync
    ```
 
-3. 測試 ddddocr：
+4. 測試 ddddocr：
    ```bash
-   .venv/bin/python -c "import ddddocr; print('OK')"
+   uv run python -c "import ddddocr; print('ddddocr OK')"
    ```
 
-### 問題 4：權限不足 (Permission denied)
+### 問題 5：權限不足 (Permission denied)
 
 **錯誤訊息**：
 ```
@@ -414,7 +463,7 @@ Permission denied: '/usr/bin/chromium-browser'
    chmod 755 downloads logs temp
    ```
 
-### 問題 5：記憶體不足 (Out of Memory)
+### 問題 6：記憶體不足 (Out of Memory)
 
 **錯誤訊息**：
 ```
@@ -439,7 +488,7 @@ session deleted because of page crash
      sudo swapon /swapfile
      ```
 
-### 問題 6：網路連線問題
+### 問題 7：網路連線問題
 
 **錯誤訊息**：
 ```
@@ -460,7 +509,7 @@ TimeoutException: Message: timeout
 
 3. 增加等待時間（修改程式碼中的 timeout 參數）
 
-### 問題 7：UV 未加入 PATH
+### 問題 8：UV 未加入 PATH
 
 **錯誤訊息**：
 ```
