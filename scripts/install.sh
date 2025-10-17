@@ -105,11 +105,45 @@ print_header "步驟 1/7: Python 環境檢查"
 if command -v python3 &> /dev/null; then
     PYTHON_VERSION=$(python3 --version)
     print_success "Python: $PYTHON_VERSION"
+
+    # Ubuntu 環境檢查並安裝 Pillow 編譯依賴
+    if [ "$IS_UBUNTU" = true ]; then
+        print_info "檢查 Pillow 編譯依賴..."
+
+        # 檢查 zlib1g-dev 是否已安裝（代表性套件）
+        if ! dpkg -l | grep -q "zlib1g-dev"; then
+            print_warning "缺少 Pillow 編譯依賴，開始安裝..."
+
+            if [ "$IS_ROOT" = false ]; then
+                if ! sudo -v; then
+                    print_error "需要 sudo 權限安裝系統套件"
+                    exit 1
+                fi
+            fi
+
+            print_info "安裝 Pillow 編譯依賴 (用於 ddddocr)..."
+            $SUDO_CMD apt-get update -qq
+            $SUDO_CMD apt-get install -y \
+                build-essential \
+                python3-dev \
+                zlib1g-dev \
+                libjpeg-dev \
+                libtiff-dev \
+                libfreetype6-dev \
+                liblcms2-dev \
+                libwebp-dev \
+                libopenjp2-7-dev
+
+            print_success "Pillow 編譯依賴安裝完成"
+        else
+            print_success "Pillow 編譯依賴已安裝"
+        fi
+    fi
 else
     print_warning "Python 未安裝"
 
     if [ "$IS_UBUNTU" = true ]; then
-        print_info "正在安裝 Python..."
+        print_info "正在安裝 Python 和編譯依賴..."
         if [ "$IS_ROOT" = false ]; then
             if ! sudo -v; then
                 print_error "需要 sudo 權限安裝系統套件"
@@ -117,11 +151,26 @@ else
             fi
         fi
         $SUDO_CMD apt-get update -qq
-        $SUDO_CMD apt-get install -y python3 python3-pip curl
+
+        # 安裝 Python 和 Pillow 編譯依賴
+        print_info "安裝 Python 基礎套件..."
+        $SUDO_CMD apt-get install -y python3 python3-pip python3-dev curl
+
+        print_info "安裝 Pillow 編譯依賴 (用於 ddddocr)..."
+        $SUDO_CMD apt-get install -y \
+            build-essential \
+            zlib1g-dev \
+            libjpeg-dev \
+            libtiff-dev \
+            libfreetype6-dev \
+            liblcms2-dev \
+            libwebp-dev \
+            libopenjp2-7-dev
 
         if command -v python3 &> /dev/null; then
             PYTHON_VERSION=$(python3 --version)
             print_success "Python 安裝成功: $PYTHON_VERSION"
+            print_success "Pillow 編譯依賴安裝完成"
         else
             print_error "Python 安裝失敗"
             exit 1
