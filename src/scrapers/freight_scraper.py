@@ -32,11 +32,14 @@ class FreightScraper(BaseScraper):
     繼承自 BaseScraper，複用登入和驗證碼處理功能
     """
 
+    # 設定環境變數 key
+    DOWNLOAD_DIR_ENV_KEY = "FREIGHT_DOWNLOAD_DIR"
+
     def __init__(
-        self, username, password, headless=False, download_base_dir="downloads", start_date=None, end_date=None
+        self, username, password, headless=None, start_date=None, end_date=None
     ):
         # 呼叫父類建構子
-        super().__init__(username, password, headless, download_base_dir)
+        super().__init__(username, password, headless)
 
         # FreightScraper 特有的屬性
         # 日期範圍設定（格式：YYYYMMDD）

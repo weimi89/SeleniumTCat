@@ -1,23 +1,17 @@
-{
-  "accounts": [
-    {
-      "username": "您的帳號1", 
-      "password": "您的密碼1", 
-      "enabled": true
-    },
-    {
-      "username": "您的帳號2", 
-      "password": "您的密碼2", 
-      "enabled": true
-    },
-    {
-      "username": "您的帳號3", 
-      "password": "您的密碼3", 
-      "enabled": false
-    }
-  ],
-  "settings": {
-    "headless": false,
-    "download_base_dir": "downloads"
+[
+  {
+    "username": "您的帳號1",
+    "password": "您的密碼1",
+    "enabled": true
+  },
+  {
+    "username": "您的帳號2",
+    "password": "您的密碼2",
+    "enabled": true
+  },
+  {
+    "username": "您的帳號3",
+    "password": "您的密碼3",
+    "enabled": false
   }
-}
+]

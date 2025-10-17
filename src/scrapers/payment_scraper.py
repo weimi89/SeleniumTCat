@@ -32,9 +32,12 @@ class PaymentScraper(BaseScraper):
     繼承自 BaseScraper，複用登入和驗證碼處理功能
     """
 
-    def __init__(self, username, password, headless=False, download_base_dir="downloads", period_number=1):
+    # 設定環境變數 key
+    DOWNLOAD_DIR_ENV_KEY = "PAYMENT_DOWNLOAD_DIR"
+
+    def __init__(self, username, password, headless=None, period_number=1):
         # 呼叫父類建構子
-        super().__init__(username, password, headless, download_base_dir)
+        super().__init__(username, password, headless)
 
         # PaymentScraper 特有的屬性
         # 儲存當前選擇的結算區間

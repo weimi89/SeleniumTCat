@@ -270,7 +270,7 @@ print_header "測試結果總結"
 
 echo ""
 echo -e "${GREEN}✅ 通過: $PASS_COUNT${NC}"
-echo -e "${YELLOW}⚠️  警告: $WARN_COUNT${NC}"
+echo -e "${YELLOW}⚠️ 警告: $WARN_COUNT${NC}"
 echo -e "${RED}❌ 失敗: $FAIL_COUNT${NC}"
 echo ""
 

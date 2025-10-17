@@ -24,14 +24,23 @@ from ..utils.windows_encoding_utils import safe_print
 class BaseScraper:
     """黑貓宅急便基礎抓取器類別"""
 
-    def __init__(self, username, password, headless=False, download_base_dir="downloads"):
+    # 子類別必須覆寫此類別變數，指定環境變數名稱
+    DOWNLOAD_DIR_ENV_KEY = None
+
+    def __init__(self, username, password, headless=None):
         # 載入環境變數
         load_dotenv()
 
         self.url = "https://www.takkyubin.com.tw/YMTContract/aspx/Login.aspx"
         self.username = username
         self.password = password
-        self.headless = headless
+
+        # headless 優先級: CLI 參數 > 環境變數 > 預設值 (true)
+        if headless is not None:
+            self.headless = headless
+        else:
+            env_headless = os.getenv("HEADLESS", "true").lower()
+            self.headless = env_headless == "true"
 
         self.driver = None
         self.wait = None
@@ -46,6 +55,12 @@ class BaseScraper:
 
         # 初始化 ddddocr
         self.ocr = ddddocr.DdddOcr(show_ad=False)
+
+        # 從環境變數讀取下載目錄
+        if self.DOWNLOAD_DIR_ENV_KEY is None:
+            raise NotImplementedError("子類別必須設定 DOWNLOAD_DIR_ENV_KEY")
+
+        download_base_dir = os.getenv(self.DOWNLOAD_DIR_ENV_KEY, "downloads")
 
         # 所有檔案都放在同一層的下載目錄
         self.final_download_dir = Path(download_base_dir)

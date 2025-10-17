@@ -1,7 +1,7 @@
 ---
-description: 
+description:
 globs: []
-alwaysApply: false
+alwaysApply: true
 ---
 
 # BMAD-MASTER Agent Rule

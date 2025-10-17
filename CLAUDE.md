@@ -108,8 +108,16 @@ PYTHONPATH="$(pwd)" uv run python -u src/scrapers/{payment|freight|unpaid}_scrap
 
 ### 設定檔
 
-- **accounts.json**: 帳號設定 (enabled, username, password, settings)，參考 .example 建立 ⚠️ 已加入 .gitignore
-- **.env**: Chrome 路徑 (CHROME_BINARY_PATH)，從 .env.example 建立
+- **accounts.json**: 帳號設定 (enabled, username, password)，參考 .example 建立 ⚠️ 已加入 .gitignore
+  - 新格式: 純陣列 `[{username, password, enabled}, ...]`
+  - 舊格式 `{accounts: [...], settings: {...}}` 仍支援但 settings 會被忽略並顯示警告
+- **.env**: 環境設定 (CHROME_BINARY_PATH, HEADLESS, *_DOWNLOAD_DIR)，從 .env.example 建立 ⚠️ 已加入 .gitignore
+  - CHROME_BINARY_PATH: Chrome 瀏覽器路徑
+  - HEADLESS: 無頭模式 (true/false，預設 true)
+  - PAYMENT_DOWNLOAD_DIR: 貨到付款檔案下載目錄 (預設 downloads)
+  - FREIGHT_DOWNLOAD_DIR: 運費發票檔案下載目錄 (預設 downloads)
+  - UNPAID_DOWNLOAD_DIR: 交易明細檔案下載目錄 (預設 downloads)
+  - 配置優先級: 命令列參數 > 環境變數 > 預設值
 - **pyproject.toml**: Python 專案設定、依賴管理
 
 ## 輸出

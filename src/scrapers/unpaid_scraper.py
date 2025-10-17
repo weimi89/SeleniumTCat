@@ -32,9 +32,12 @@ class UnpaidScraper(BaseScraper):
     繼承自 BaseScraper，複用登入和驗證碼處理功能
     """
 
-    def __init__(self, username, password, headless=False, download_base_dir="downloads", periods=2):
+    # 設定環境變數 key
+    DOWNLOAD_DIR_ENV_KEY = "UNPAID_DOWNLOAD_DIR"
+
+    def __init__(self, username, password, headless=None, periods=2):
         # 呼叫父類建構子
-        super().__init__(username, password, headless, download_base_dir)
+        super().__init__(username, password, headless)
 
         # UnpaidScraper 特有的屬性
         # 週期設定（預設2期，1週1個檔案）

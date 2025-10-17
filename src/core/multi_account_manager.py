@@ -10,6 +10,7 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
+from dotenv import load_dotenv
 
 from ..utils.windows_encoding_utils import safe_print
 
@@ -18,6 +19,9 @@ class MultiAccountManager:
     """多帳號管理器"""
 
     def __init__(self, config_file="accounts.json"):
+        # 載入環境變數
+        load_dotenv()
+
         self.config_file = config_file
         self.load_config()
 
@@ -31,14 +35,46 @@ class MultiAccountManager:
         if not os.path.exists(self.config_file):
             raise FileNotFoundError(
                 f"⛔ 設定檔 '{self.config_file}' 不存在！\n"
-                "📝 請建立 accounts.json 檔案，包含 accounts 和 settings 設定"
+                "📝 請建立 accounts.json 檔案，格式為帳號陣列\n"
+                "範例: [{\"username\": \"...\", \"password\": \"...\", \"enabled\": true}]"
             )
 
         try:
             with open(self.config_file, "r", encoding="utf-8") as f:
-                self.config = json.load(f)
+                config = json.load(f)
 
-            if "accounts" not in self.config or not self.config["accounts"]:
+            # 檢測舊格式（dict 且包含 accounts 或 settings）
+            if isinstance(config, dict):
+                safe_print("⚠️  警告: 檢測到舊的配置格式")
+                safe_print("請將 accounts.json 改為純陣列格式，並移除 settings 設定")
+                safe_print("範例: [{\"username\": \"...\", \"password\": \"...\", \"enabled\": true}]")
+                safe_print("環境設定請改用 .env 檔案 (HEADLESS, PAYMENT_DOWNLOAD_DIR 等)")
+                safe_print("詳細說明: README.md#配置遷移")
+                safe_print("")
+
+                # 嘗試自動提取 accounts 陣列（但仍警告）
+                if "accounts" in config:
+                    self.config = config["accounts"]
+                    safe_print("✅ 暫時相容舊格式: 已自動提取 accounts 陣列")
+                else:
+                    raise ValueError("舊格式配置但沒有 'accounts' 欄位")
+
+                # 檢查並警告舊的 settings
+                if "settings" in config:
+                    old_settings = config["settings"]
+                    safe_print("⚠️  舊的 settings 設定將被忽略，請改用 .env 檔案:")
+                    if "headless" in old_settings:
+                        safe_print(f"   - HEADLESS={str(old_settings['headless']).lower()}")
+                    if "download_base_dir" in old_settings:
+                        safe_print(f"   - PAYMENT_DOWNLOAD_DIR={old_settings['download_base_dir']}")
+                        safe_print(f"   - FREIGHT_DOWNLOAD_DIR={old_settings['download_base_dir']}")
+                        safe_print(f"   - UNPAID_DOWNLOAD_DIR={old_settings['download_base_dir']}")
+                    safe_print("")
+            else:
+                # 新格式（陣列）
+                self.config = config
+
+            if not self.config:
                 raise ValueError("⛔ 設定檔中沒有找到帳號資訊！")
 
             safe_print(f"✅ 已載入設定檔: {self.config_file}")
@@ -50,7 +86,7 @@ class MultiAccountManager:
 
     def get_enabled_accounts(self):
         """取得啟用的帳號列表"""
-        return [acc for acc in self.config["accounts"] if acc.get("enabled", True)]
+        return [acc for acc in self.config if acc.get("enabled", True)]
 
     def run_all_accounts(self, scraper_class, headless_override=None, progress_callback=None, **scraper_kwargs):
         """
@@ -68,7 +104,6 @@ class MultiAccountManager:
 
         accounts = self.get_enabled_accounts()
         results = []
-        settings = self.config.get("settings", {})
 
         if progress_callback:
             progress_callback(f"🚀 開始執行多帳號黑貓宅急便自動下載 (共 {len(accounts)} 個帳號)")
@@ -89,20 +124,22 @@ class MultiAccountManager:
                 print("-" * 50)
 
             try:
-                # 優先級：命令列參數（如果有指定）> 設定檔 > 預設值 False
+                # headless 優先級：命令列參數 > 環境變數 > 預設值
+                # headless_override 傳遞給 scraper，由 scraper 處理優先級
                 if headless_override is not None:
                     use_headless = headless_override
                     safe_print(f"🔧 使用命令列 headless 設定: {use_headless}")
                 else:
-                    use_headless = settings.get("headless", False)
-                    safe_print(f"🔧 使用設定檔 headless 設定: {use_headless}")
+                    # None 表示使用環境變數或預設值
+                    use_headless = None
+                    env_headless = os.getenv("HEADLESS", "true").lower()
+                    safe_print(f"🔧 使用環境變數 HEADLESS 設定: {env_headless}")
 
                 # 準備 scraper 基本參數
                 scraper_init_kwargs = {
                     "username": username,
                     "password": password,
                     "headless": use_headless,
-                    "download_base_dir": settings.get("download_base_dir", "downloads"),
                 }
 
                 # 合併額外的 scraper 參數
