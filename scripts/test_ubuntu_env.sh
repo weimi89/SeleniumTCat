@@ -228,8 +228,17 @@ if [ -d ".venv" ]; then
         # 嘗試導入關鍵模組
         PYTHON_CMD=".venv/bin/python"
 
+        # 檢查關鍵模組（模組名稱 -> 導入名稱映射）
+        declare -A module_map=(
+            ["selenium"]="selenium"
+            ["ddddocr"]="ddddocr"
+            ["openpyxl"]="openpyxl"
+            ["python-dotenv"]="dotenv"
+        )
+
         for module in selenium ddddocr openpyxl python-dotenv; do
-            if $PYTHON_CMD -c "import ${module//-/_}" 2>/dev/null; then
+            import_name="${module_map[$module]}"
+            if $PYTHON_CMD -c "import $import_name" 2>/dev/null; then
                 test_pass "Python 模組已安裝: $module"
             else
                 test_warn "Python 模組未安裝或無法導入: $module"
