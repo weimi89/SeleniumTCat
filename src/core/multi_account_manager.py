@@ -13,6 +13,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from ..utils.windows_encoding_utils import safe_print
+from ..utils.discord_notifier import DiscordNotifier
 
 
 class MultiAccountManager:
@@ -29,6 +30,9 @@ class MultiAccountManager:
         self.total_start_time = None
         self.total_end_time = None
         self.total_execution_minutes = 0
+
+        # Discord 通知器
+        self.discord_notifier = DiscordNotifier()
 
     def load_config(self):
         """載入設定檔"""
@@ -311,4 +315,26 @@ class MultiAccountManager:
             )
 
         safe_print(f"\n💾 詳細報告已保存: {report_file}")
+
+        # 發送 Discord 通知
+        if self.discord_notifier.is_enabled():
+            safe_print("\n📢 正在發送 Discord 通知...")
+
+            # 發送執行摘要
+            self.discord_notifier.send_execution_summary(
+                total_accounts=len(results),
+                successful_accounts=len(successful_accounts),
+                failed_accounts=len(other_failed_accounts),
+                security_warning_accounts=len(security_warning_accounts),
+                total_downloads=total_downloads,
+                total_execution_minutes=self.total_execution_minutes if hasattr(self, "total_execution_minutes") else 0,
+            )
+
+            # 如果有密碼安全警告，額外發送詳細通知
+            if security_warning_accounts:
+                self.discord_notifier.send_security_warning_notification(
+                    security_warning_accounts=security_warning_accounts,
+                    total_execution_minutes=self.total_execution_minutes if hasattr(self, "total_execution_minutes") else 0,
+                )
+
         print("=" * 80)
