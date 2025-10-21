@@ -62,6 +62,7 @@ src/
 - **AJAX 處理**: FreightScraper, UnpaidScraper 支援 AJAX 搜尋
 - **跨平台**: .env 設定 Chrome 路徑、uv 依賴管理
 - **多帳號**: MultiAccountManager 3 秒間隔（避免速率限制）
+- **Discord 通知**: 自動發送執行摘要和密碼安全警告通知（可選功能）
 
 ## 開發指令
 
@@ -117,8 +118,23 @@ PYTHONPATH="$(pwd)" uv run python -u src/scrapers/{payment|freight|unpaid}_scrap
   - PAYMENT_DOWNLOAD_DIR: 貨到付款檔案下載目錄 (預設 downloads)
   - FREIGHT_DOWNLOAD_DIR: 運費發票檔案下載目錄 (預設 downloads)
   - UNPAID_DOWNLOAD_DIR: 交易明細檔案下載目錄 (預設 downloads)
+  - DISCORD_WEBHOOK_URL: Discord Webhook URL，設定後會在執行完成時發送通知（可選）
   - 配置優先級: 命令列參數 > 環境變數 > 預設值
 - **pyproject.toml**: Python 專案設定、依賴管理
+
+### Discord 通知（可選功能）
+
+設定 DISCORD_WEBHOOK_URL 後，系統會在所有帳號處理完成時自動發送通知到 Discord 頻道：
+
+- **執行摘要通知**: 總帳號數、成功/失敗數、下載檔案數、執行時間
+- **密碼安全警告**: 當有帳號需要更新密碼時，會發送詳細的警告通知（使用 @here 標記）
+
+取得 Webhook URL：Discord 伺服器設定 → 整合 → Webhook → 建立 Webhook
+
+測試通知功能：
+```bash
+PYTHONPATH="$(pwd)" uv run python tests/test_discord_notifier.py
+```
 
 ## 輸出
 
