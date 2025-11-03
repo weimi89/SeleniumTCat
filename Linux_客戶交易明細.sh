@@ -17,32 +17,38 @@ echo ""
 # 設定參數陣列
 final_args=("$@")
 
-# 檢查是否沒有 --periods 參數
-has_periods=false
+# 檢查是否沒有 --days 參數
+has_days=false
 for arg in "$@"; do
-    if [[ "$arg" == "--periods" ]]; then
-        has_periods=true
+    if [[ "$arg" == "--days" ]]; then
+        has_days=true
         break
     fi
 done
 
-# 詢問下載週期數（如果命令列沒有指定）
-if [[ "$has_periods" == false ]]; then
+# 詢問下載天數（如果命令列沒有指定）
+if [[ "$has_days" == false ]]; then
     echo "📅 下載範圍設定"
-    echo "請輸入要下載的週期數："
-    echo "• 1 = 下載最新 1 週期"
-    echo "• 2 = 下載最新 2 週期（預設）"
-    echo "• 3 = 下載最新 3 週期"
-    echo "• 0 或空白 = 下載最新 2 週期（預設）"
+    echo "請輸入要下載的天數："
+    echo "• 例如：30 = 前 30 天"
+    echo "• 例如：7 = 前 7 天"
+    echo "• 空白 = 使用預設 30 天"
     echo ""
 
-    read -p "週期數: " periods_input
+    read -p "天數: " days_input
 
-    if [[ "$periods_input" =~ ^[0-9]+$ && "$periods_input" -gt 0 ]]; then
-        final_args+=("--periods" "$periods_input")
-        echo "✅ 將下載最新 $periods_input 個週期"
+    # 驗證天數格式
+    if [[ "$days_input" =~ ^[0-9]+$ ]]; then
+        if [[ $days_input -gt 0 && $days_input -le 365 ]]; then
+            final_args+=("--days" "$days_input")
+            echo "✅ 將下載前 ${days_input} 天的交易明細"
+        else
+            echo "⚠️ 天數必須在 1-365 之間，使用預設 30 天"
+        fi
+    elif [[ -n "$days_input" ]]; then
+        echo "⚠️ 天數格式錯誤，使用預設 30 天"
     else
-        echo "✅ 使用預設值：下載最新 2 個週期"
+        echo "✅ 使用預設 30 天"
     fi
     echo ""
 fi
