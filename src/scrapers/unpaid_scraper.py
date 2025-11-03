@@ -35,15 +35,22 @@ class UnpaidScraper(BaseScraper):
     # 設定環境變數 key
     DOWNLOAD_DIR_ENV_KEY = "UNPAID_DOWNLOAD_DIR"
 
-    def __init__(self, username, password, headless=None, periods=2):
+    def __init__(self, username, password, headless=None, days=None):
         # 呼叫父類建構子
         super().__init__(username, password, headless)
 
         # UnpaidScraper 特有的屬性
-        # 週期設定（預設2期，1週1個檔案）
-        self.periods = periods
+        # 天數設定（預設為 30 天）
+        if days is None:
+            days = 30
+        
+        self.days = days
+        
+        # 驗證天數
+        if not isinstance(self.days, int) or self.days <= 0:
+            raise ValueError(f"天數必須為正整數: {self.days}")
 
-        safe_print(f"📅 預設查詢 {self.periods} 個週期")
+        safe_print(f"📅 查詢範圍: 前 {self.days} 天")
 
     def navigate_to_transaction_detail(self):
         """導航到交易明細表頁面 - 包含完整重試機制和 session timeout 處理"""
@@ -563,115 +570,49 @@ class UnpaidScraper(BaseScraper):
             # 沒有 alert 或其他處理失敗
             return False
 
-    def set_period_search(self):
-        """設定週期搜尋方式，預設會抓2期(1週1個檔案)"""
-        safe_print(f"📅 設定週期搜尋方式 ({self.periods} 期)...")
 
-        try:
-            # 這裡需要根據實際的週期選擇介面來實作
-            # 目前作為佔位符，待有實際的 HTML 結構後再詳細實作
-
-            # 檢查頁面是否有週期選擇功能
-            page_source = self.driver.page_source
-
-            if "週期" in page_source:
-                safe_print("✅ 頁面支援週期選擇")
-                # 這裡添加週期選擇的具體邏輯
-                # 可能需要選擇下拉選單或填寫特定的週期數值
-                return True
-            else:
-                safe_print("⚠️ 頁面不支援週期選擇，使用預設設定")
-                return True
-
-        except Exception as e:
-            safe_print(f"❌ 週期設定失敗: {e}")
-            return False
-
-    def search_and_download_periods(self):
-        """搜尋並下載指定週期的交易明細"""
-        safe_print(f"🔍 開始搜尋並下載 {self.periods} 個週期的交易明細...")
+    def search_and_download_days(self):
+        """搜尋並下載指定天數範圍的交易明細"""
+        safe_print(f"🔍 開始搜尋並下載前 {self.days} 天的交易明細...")
 
         downloaded_files = []
-        period_details = []  # 記錄每期的詳細情況
+        days_details = {}
 
         try:
-            # 為每個週期執行下載
-            for period in range(1, self.periods + 1):
-                safe_print(f"\n📊 處理第 {period} 期...")
+            # 設定本次下載的 UUID 臨時目錄
+            self.setup_temp_download_dir()
 
-                # 期間重置邏輯：第2期及以後需要重新準備頁面狀態
-                if period > 1:
-                    safe_print(f"🔄 準備第 {period} 期頁面狀態...")
-                    reset_success = self._reset_page_for_next_period()
-                    if not reset_success:
-                        safe_print(f"⚠️ 第 {period} 期頁面重置失敗，嘗試繼續...")
+            # 計算天數的日期範圍
+            start_date, end_date = self._calculate_date_range()
+            safe_print(f"📅 日期範圍: {start_date} - {end_date}")
 
-                # 設定該週期的日期範圍
-                period_result = self._download_period_data_with_details(period)
+            # 執行下載
+            days_result = self._download_days_data_with_details(start_date, end_date)
 
-                # 記錄每期詳細情況
-                period_details.append(period_result)
+            # 記錄天數範圍詳細情況
+            days_details = days_result
 
-                if period_result["files"]:
-                    downloaded_files.extend(period_result["files"])
-                    safe_print(f"✅ 第 {period} 期下載完成: {len(period_result['files'])} 個檔案")
-                elif period_result["status"] == "no_records":
-                    safe_print(
-                        f"⚠️ 第 {period} 期無交易記錄 ({period_result['start_date']} - {period_result['end_date']})"
-                    )
-                else:
-                    safe_print(f"⚠️ 第 {period} 期下載失敗: {period_result.get('error', '未知錯誤')}")
+            if days_result["files"]:
+                downloaded_files.extend(days_result["files"])
+                safe_print(f"✅ 前 {self.days} 天下載完成: {len(days_result['files'])} 個檔案")
+            elif days_result["status"] == "no_records":
+                safe_print(f"⚠️ 前 {self.days} 天無交易記錄 ({start_date} - {end_date})")
+            else:
+                safe_print(f"⚠️ 前 {self.days} 天下載失敗: {days_result.get('error', '未知錯誤')}")
 
-                # 週期間等待
-                if period < self.periods:
-                    safe_print(f"⏳ 等待 2 秒後處理下一期...")
-                    time.sleep(2)
-
-            return downloaded_files, period_details
+            return downloaded_files, days_details
 
         except Exception as e:
-            safe_print(f"❌ 週期搜尋和下載失敗: {e}")
-            return downloaded_files, period_details
+            safe_print(f"❌ 搜尋和下載失敗: {e}")
+            return downloaded_files, days_details
 
-    def _reset_page_for_next_period(self):
-        """為下一期重置頁面狀態 - 直接導航到交易明細表URL"""
-        try:
-            safe_print("🔄 導航到交易明細表頁面刷新...")
 
-            # 直接導航到交易明細表完整URL
-            transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
-            old_url = self.driver.current_url
-            self.driver.get(transaction_url)
+    def _download_days_data_with_details(self, start_date, end_date, max_retries=3):
+        """下載指定天數範圍的資料並返回詳細信息，支援重試機制"""
+        safe_print(f"📥 下載資料 ({start_date} - {end_date})...")
 
-            # 智慧等待頁面載入
-            self.smart_wait_for_url_change(old_url, timeout=5)
-
-            safe_print("✅ 成功導航到交易明細表頁面")
-            return True
-
-        except Exception as e:
-            safe_print(f"❌ 導航到交易明細表頁面失敗: {e}")
-            # 如果直接導航失敗，回到原本的導航方法
-            safe_print("🔄 使用原本的導航方法...")
-            return self.navigate_to_transaction_detail()
-
-        except Exception as e:
-            safe_print(f"❌ 頁面重置失敗: {e}")
-            return False
-
-    def _download_period_data_with_details(self, period, max_retries=3):
-        """下載特定週期的資料並返回詳細信息，支援重試機制"""
-        safe_print(f"📥 下載第 {period} 期資料...")
-
-        # 設定本次下載的 UUID 臨時目錄
-        self.setup_temp_download_dir()
-
-        # 計算週期的開始和結束日期
-        start_date, end_date = self._calculate_period_dates(period)
-        safe_print(f"📅 第 {period} 期日期範圍: {start_date} - {end_date}")
-
-        period_info = {
-            "period": period,
+        days_info = {
+            "days": self.days,
             "start_date": start_date,
             "end_date": end_date,
             "status": "unknown",
@@ -683,7 +624,7 @@ class UnpaidScraper(BaseScraper):
         for retry in range(max_retries):
             try:
                 if retry > 0:
-                    safe_print(f"🔄 第 {period} 期第 {retry + 1} 次重試...")
+                    safe_print(f"🔄 下載第 {retry + 1} 次重試...")
                     # 重新載入頁面
                     transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
                     old_url = self.driver.current_url
@@ -696,127 +637,30 @@ class UnpaidScraper(BaseScraper):
                 # 執行 AJAX 搜尋請求
                 search_success = self._perform_ajax_search(start_date, end_date)
                 if not search_success:
-                    safe_print(f"⚠️ 第 {period} 期 AJAX 搜尋失敗")
+                    safe_print(f"⚠️ AJAX 搜尋失敗")
                     if retry < max_retries - 1:
                         continue
                     else:
-                        period_info["status"] = "search_failed"
-                        period_info["error"] = "AJAX 搜尋失敗"
-                        return period_info
+                        days_info["status"] = "search_failed"
+                        days_info["error"] = "AJAX 搜尋失敗"
+                        return days_info
 
                 # 等待搜尋結果載入
                 download_ready = self._wait_for_search_results()
                 if not download_ready:
-                    safe_print(f"⚠️ 第 {period} 期搜尋結果載入超時或無資料")
+                    safe_print(f"⚠️ 搜尋結果載入超時或無資料")
                     if retry < max_retries - 1:
                         continue
                     else:
-                        period_info["status"] = "no_results"
-                        period_info["error"] = "搜尋結果載入超時"
-                        return period_info
+                        days_info["status"] = "no_results"
+                        days_info["error"] = "搜尋結果載入超時"
+                        return days_info
 
-                # 檢查記錄筆數
-                records_available = self._check_records_count()
-                if not records_available:
-                    safe_print(f"⚠️ 第 {period} 期無交易記錄，跳過下載")
-                    period_info["status"] = "no_records"
-                    period_info["record_count"] = 0
-                    return period_info
 
                 # 點擊下載按鈕
                 download_success = self._click_download_button()
                 if not download_success:
-                    safe_print(f"⚠️ 第 {period} 期下載按鈕點擊失敗")
-                    if retry < max_retries - 1:
-                        continue
-                    else:
-                        period_info["status"] = "download_failed"
-                        period_info["error"] = "下載按鈕點擊失敗"
-                        return period_info
-
-                # 等待檔案下載（30秒超時）
-                downloaded_files = self._wait_for_download(files_before, timeout=30)
-
-                if downloaded_files:
-                    # 重命名檔案（格式：{帳號}_{開始日期}_{結束日期}）
-                    renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
-                    # 使用檔案移動機制將檔案從臨時目錄移動到最終目錄
-                    final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
-                    safe_print(f"✅ 第 {period} 期下載成功")
-                    period_info["status"] = "success"
-                    period_info["files"] = final_files
-                    return period_info
-                else:
-                    if retry < max_retries - 1:
-                        safe_print(f"⚠️ 第 {period} 期下載超時，將重試...")
-                        continue
-                    else:
-                        safe_print(f"❌ 第 {period} 期下載失敗（所有重試完畢）")
-                        period_info["status"] = "download_timeout"
-                        period_info["error"] = "下載超時"
-                        return period_info
-
-            except Exception as e:
-                if retry < max_retries - 1:
-                    safe_print(f"⚠️ 第 {period} 期下載異常 (第 {retry + 1} 次): {e}")
-                    safe_print("🔄 將重試...")
-                else:
-                    safe_print(f"❌ 第 {period} 期資料下載失敗 (所有重試完畢): {e}")
-                    period_info["status"] = "error"
-                    period_info["error"] = str(e)
-                    return period_info
-
-        return period_info
-
-    def _download_period_data(self, period, max_retries=3):
-        """下載特定週期的資料，支援重試機制"""
-        safe_print(f"📥 下載第 {period} 期資料...")
-
-        # 計算週期的開始和結束日期
-        start_date, end_date = self._calculate_period_dates(period)
-        safe_print(f"📅 第 {period} 期日期範圍: {start_date} - {end_date}")
-
-        for retry in range(max_retries):
-            try:
-                if retry > 0:
-                    safe_print(f"🔄 第 {period} 期第 {retry + 1} 次重試...")
-                    # 重新載入頁面
-                    transaction_url = "https://www.takkyubin.com.tw/YMTContract/aspx/RedirectFunc.aspx?FuncNo=167"
-                    old_url = self.driver.current_url
-                    self.driver.get(transaction_url)
-                    self.smart_wait_for_url_change(old_url, timeout=5)
-
-                # 記錄下載前的檔案
-                files_before = set(self.download_dir.glob("*"))
-
-                # 執行 AJAX 搜尋請求
-                search_success = self._perform_ajax_search(start_date, end_date)
-                if not search_success:
-                    safe_print(f"⚠️ 第 {period} 期 AJAX 搜尋失敗")
-                    if retry < max_retries - 1:
-                        continue
-                    else:
-                        return []
-
-                # 等待搜尋結果載入
-                download_ready = self._wait_for_search_results()
-                if not download_ready:
-                    safe_print(f"⚠️ 第 {period} 期搜尋結果載入超時或無資料")
-                    if retry < max_retries - 1:
-                        continue
-                    else:
-                        return []
-
-                # 檢查記錄筆數
-                records_available = self._check_records_count()
-                if not records_available:
-                    safe_print(f"⚠️ 第 {period} 期無交易記錄，跳過下載")
-                    return []
-
-                # 點擊下載按鈕
-                download_success = self._click_download_button()
-                if not download_success:
-                    safe_print(f"⚠️ 第 {period} 期下載按鈕點擊失敗")
+                    safe_print(f"⚠️ 下載按鈕點擊失敗")
                     if retry < max_retries - 1:
                         continue
                     else:
@@ -830,48 +674,58 @@ class UnpaidScraper(BaseScraper):
                     renamed_files = self._rename_period_files(downloaded_files, start_date, end_date)
                     # 使用新的檔案移動機制
                     final_files = self.move_and_cleanup_files(renamed_files, renamed_files)
-                    safe_print(f"✅ 第 {period} 期下載成功")
-                    return final_files
+                    safe_print(f"✅ 下載成功")
+                    days_info["status"] = "success"
+                    days_info["files"] = final_files
+                    return days_info
                 else:
                     if retry < max_retries - 1:
-                        safe_print(f"⚠️ 第 {period} 期下載超時，將重試...")
+                        safe_print(f"⚠️ 下載超時，將重試...")
                         continue
                     else:
-                        safe_print(f"❌ 第 {period} 期下載失敗（所有重試完畢）")
-                        return []
+                        safe_print(f"❌ 下載失敗（所有重試完畢）")
+                        days_info["status"] = "download_failed"
+                        days_info["error"] = "下載超時"
+                        return days_info
 
             except Exception as e:
                 if retry < max_retries - 1:
-                    safe_print(f"⚠️ 第 {period} 期下載異常 (第 {retry + 1} 次): {e}")
+                    safe_print(f"⚠️ 下載異常 (第 {retry + 1} 次): {e}")
                     safe_print("🔄 將重試...")
                 else:
-                    safe_print(f"❌ 第 {period} 期資料下載失敗 (所有重試完畢): {e}")
-                    return []
+                    safe_print(f"❌ 資料下載失敗 (所有重試完畢): {e}")
+                    days_info["status"] = "error"
+                    days_info["error"] = str(e)
+                    return days_info
 
-        return []
+        return days_info
 
-    def _calculate_period_dates(self, period):
-        """計算週期的開始和結束日期"""
+    def _calculate_date_range(self):
+        """計算從今天往前推指定天數的日期範圍"""
         try:
-            # 以當前日期為基準，往前推算週期
-            today = datetime.now()
-
-            # 計算該週期的結束日期（每週期7天）
-            period_end = today - timedelta(days=(period - 1) * 7)
-            # 計算該週期的開始日期
-            period_start = period_end - timedelta(days=6)
-
-            start_date = period_start.strftime("%Y%m%d")
-            end_date = period_end.strftime("%Y%m%d")
-
+            from datetime import datetime, timedelta
+            
+            # 結束日期為今天
+            end_date_obj = datetime.now()
+            # 開始日期為今天往前推 N 天
+            start_date_obj = end_date_obj - timedelta(days=self.days - 1)
+            
+            # 轉換為字串格式 YYYYMMDD
+            start_date = start_date_obj.strftime("%Y%m%d")
+            end_date = end_date_obj.strftime("%Y%m%d")
+            
+            safe_print(f"📅 日期範圍: {start_date} - {end_date} (前 {self.days} 天)")
+            
             return start_date, end_date
-
+            
         except Exception as e:
-            safe_print(f"❌ 週期日期計算失敗: {e}")
-            # 回傳預設值
-            today = datetime.now()
-            start_date = (today - timedelta(days=7)).strftime("%Y%m%d")
-            end_date = today.strftime("%Y%m%d")
+            safe_print(f"❌ 日期計算失敗: {e}")
+            # 回傳預設值（前 30 天）
+            from datetime import datetime, timedelta
+            end_date_obj = datetime.now()
+            start_date_obj = end_date_obj - timedelta(days=29)
+            start_date = start_date_obj.strftime("%Y%m%d")
+            end_date = end_date_obj.strftime("%Y%m%d")
             return start_date, end_date
 
     def _perform_ajax_search(self, start_date, end_date):
@@ -1279,13 +1133,8 @@ class UnpaidScraper(BaseScraper):
                     safe_print(f"❌ 帳號 {self.username} 導航失敗")
                     return {"success": False, "username": self.username, "error": "導航失敗", "downloads": []}
 
-            # 4. 設定週期搜尋方式
-            period_success = self.set_period_search()
-            if not period_success:
-                safe_print(f"⚠️ 帳號 {self.username} 週期設定失敗，但繼續執行")
-
-            # 5. 搜尋並下載各週期的交易明細
-            downloaded_files, period_details = self.search_and_download_periods()
+            # 4. 搜尋並下載指定天數範圍的交易明細
+            downloaded_files, days_details = self.search_and_download_days()
 
             if downloaded_files:
                 safe_print(f"🎉 帳號 {self.username} 交易明細查詢流程完成！下載了 {len(downloaded_files)} 個檔案")
@@ -1293,7 +1142,7 @@ class UnpaidScraper(BaseScraper):
                     "success": True,
                     "username": self.username,
                     "downloads": [str(f) for f in downloaded_files],
-                    "period_details": period_details,
+                    "days_details": days_details,
                 }
             else:
                 safe_print(f"⚠️ 帳號 {self.username} 沒有下載到檔案")
@@ -1302,7 +1151,7 @@ class UnpaidScraper(BaseScraper):
                     "username": self.username,
                     "message": "無資料可下載",
                     "downloads": [],
-                    "period_details": period_details,
+                    "days_details": days_details,
                 }
 
         except Exception as e:
@@ -1312,7 +1161,7 @@ class UnpaidScraper(BaseScraper):
                 "username": self.username,
                 "error": str(e),
                 "downloads": [str(f) for f in downloaded_files],
-                "period_details": getattr(locals(), "period_details", []),
+                "days_details": getattr(locals(), "days_details", {}),
             }
         finally:
             # 結束執行時間計時
@@ -1326,7 +1175,7 @@ def main():
 
     parser = argparse.ArgumentParser(description="黑貓宅急便交易明細表自動下載工具")
     parser.add_argument("--headless", action="store_true", help="使用無頭模式")
-    parser.add_argument("--periods", type=int, default=2, help="要下載的週期數量 (預設: 2)")
+    parser.add_argument("--days", type=int, default=30, help="要下載的天數範圍 (預設: 30 天)")
 
     args = parser.parse_args()
 
@@ -1336,7 +1185,7 @@ def main():
         manager = MultiAccountManager("accounts.json")
         # 只有在使用者明確指定 --headless 時才覆蓋設定檔
         headless_arg = True if "--headless" in sys.argv else None
-        manager.run_all_accounts(UnpaidScraper, headless_override=headless_arg, periods=args.periods)
+        manager.run_all_accounts(UnpaidScraper, headless_override=headless_arg, days=args.days)
 
         return 0
 

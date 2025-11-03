@@ -33,24 +33,33 @@ try {
     $env:PYTHONPATH = $PWD.Path
 
 
-    # 詢問下載週期數（如果命令列沒有指定）
-    if (-not ($args -contains "--periods")) {
+    # 詢問下載天數（如果命令列沒有指定）
+    if (-not ($args -contains "--days")) {
         Write-Host "📅 下載範圍設定" -ForegroundColor Yellow
-        Write-Host "請輸入要下載的週期數："
-        Write-Host "• 1 = 下載最新 1 週期"
-        Write-Host "• 2 = 下載最新 2 週期（預設）"
-        Write-Host "• 3 = 下載最新 3 週期"
-        Write-Host "• 0 或空白 = 下載最新 2 週期（預設）"
+        Write-Host "請輸入要下載的天數："
+        Write-Host "• 例如：30 = 前 30 天"
+        Write-Host "• 例如：7 = 前 7 天"
+        Write-Host "• 空白 = 使用預設 30 天"
         Write-Host ""
 
-        $periodsInput = Read-Host "週期數"
+        $daysInput = Read-Host "天數"
 
-        if ($periodsInput -and $periodsInput -match '^\d+$' -and [int]$periodsInput -gt 0) {
-            $args += "--periods"
-            $args += $periodsInput
-            Write-Host "✅ 將下載最新 $periodsInput 個週期" -ForegroundColor Green
+        # 驗證天數格式
+        if ($daysInput -and $daysInput -match '^[0-9]+$') {
+            $days = [int]$daysInput
+            
+            # 檢查天數的合理性（1-365天）
+            if ($days -gt 0 -and $days -le 365) {
+                $args += "--days"
+                $args += $daysInput
+                Write-Host "✅ 將下載前 ${days} 天的交易明細" -ForegroundColor Green
+            } else {
+                Write-Host "⚠️ 天數必須在 1-365 之間，使用預設 30 天" -ForegroundColor Yellow
+            }
+        } elseif ($daysInput) {
+            Write-Host "⚠️ 天數格式錯誤，使用預設 30 天" -ForegroundColor Yellow
         } else {
-            Write-Host "✅ 使用預設值：下載最新 2 個週期" -ForegroundColor Green
+            Write-Host "✅ 使用預設 30 天" -ForegroundColor Green
         }
         Write-Host ""
     }
