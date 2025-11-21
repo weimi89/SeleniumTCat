@@ -411,13 +411,13 @@ HEADLESS=true
 # 注意：只有需要自訂路徑時才需要設定
 
 # 貨到付款匯款明細下載目錄
-PAYMENT_DOWNLOAD_DIR=downloads
+PAYMENT_DOWNLOAD_WORK_DIR=downloads
 
 # 運費發票明細下載目錄
-FREIGHT_DOWNLOAD_DIR=downloads
+FREIGHT_DOWNLOAD_WORK_DIR=downloads
 
 # 交易明細表下載目錄
-UNPAID_DOWNLOAD_DIR=downloads
+UNPAID_DOWNLOAD_WORK_DIR=downloads
 ```
 
 **配置優先級**：
@@ -428,9 +428,12 @@ UNPAID_DOWNLOAD_DIR=downloads
 **環境變數說明**：
 - `CHROME_BINARY_PATH` - Chrome 瀏覽器執行檔路徑
 - `HEADLESS` - 是否使用無頭模式（`true`/`false`）
-- `PAYMENT_DOWNLOAD_DIR` - 貨到付款檔案下載目錄
-- `FREIGHT_DOWNLOAD_DIR` - 運費發票檔案下載目錄
-- `UNPAID_DOWNLOAD_DIR` - 交易明細檔案下載目錄
+- `PAYMENT_DOWNLOAD_WORK_DIR` - 貨到付款檔案下載目錄
+- `FREIGHT_DOWNLOAD_WORK_DIR` - 運費發票檔案下載目錄
+- `UNPAID_DOWNLOAD_WORK_DIR` - 交易明細檔案下載目錄
+- `PAYMENT_DOWNLOAD_OK_DIR` - 貨到付款已完成目錄（設定後跳過重複下載）
+- `FREIGHT_DOWNLOAD_OK_DIR` - 運費發票已完成目錄（設定後跳過重複下載）
+- `UNPAID_DOWNLOAD_OK_DIR` - 交易明細已完成目錄（設定後跳過重複下載）
 
 ## 現代化特色
 

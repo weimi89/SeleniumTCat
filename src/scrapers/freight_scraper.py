@@ -33,7 +33,8 @@ class FreightScraper(BaseScraper):
     """
 
     # 設定環境變數 key
-    DOWNLOAD_DIR_ENV_KEY = "FREIGHT_DOWNLOAD_DIR"
+    DOWNLOAD_DIR_ENV_KEY = "FREIGHT_DOWNLOAD_WORK_DIR"
+    DOWNLOAD_OK_DIR_ENV_KEY = "FREIGHT_DOWNLOAD_OK_DIR"
 
     def __init__(
         self, username, password, headless=None, start_date=None, end_date=None
@@ -854,6 +855,12 @@ class FreightScraper(BaseScraper):
     def _download_invoice_detail(self, invoice_info):
         """在詳細頁面下載發票表格"""
         safe_print("📥 在詳細頁面下載發票表格...")
+
+        # 檢查檔案是否已下載過（在 OK_DIR 中）
+        if invoice_info:
+            target_filename = f"發票明細_{self.username}_{invoice_info['invoice_date']}_{invoice_info['invoice_number']}.xlsx"
+            if self.is_file_already_downloaded(target_filename):
+                return []  # 跳過已下載的檔案
 
         try:
             # 記錄下載前的檔案

@@ -52,7 +52,7 @@ class MultiAccountManager:
                 safe_print("⚠️  警告: 檢測到舊的配置格式")
                 safe_print("請將 accounts.json 改為純陣列格式，並移除 settings 設定")
                 safe_print("範例: [{\"username\": \"...\", \"password\": \"...\", \"enabled\": true}]")
-                safe_print("環境設定請改用 .env 檔案 (HEADLESS, PAYMENT_DOWNLOAD_DIR 等)")
+                safe_print("環境設定請改用 .env 檔案 (HEADLESS, PAYMENT_DOWNLOAD_WORK_DIR 等)")
                 safe_print("詳細說明: README.md#配置遷移")
                 safe_print("")
 
@@ -70,9 +70,9 @@ class MultiAccountManager:
                     if "headless" in old_settings:
                         safe_print(f"   - HEADLESS={str(old_settings['headless']).lower()}")
                     if "download_base_dir" in old_settings:
-                        safe_print(f"   - PAYMENT_DOWNLOAD_DIR={old_settings['download_base_dir']}")
-                        safe_print(f"   - FREIGHT_DOWNLOAD_DIR={old_settings['download_base_dir']}")
-                        safe_print(f"   - UNPAID_DOWNLOAD_DIR={old_settings['download_base_dir']}")
+                        safe_print(f"   - PAYMENT_DOWNLOAD_WORK_DIR={old_settings['download_base_dir']}")
+                        safe_print(f"   - FREIGHT_DOWNLOAD_WORK_DIR={old_settings['download_base_dir']}")
+                        safe_print(f"   - UNPAID_DOWNLOAD_WORK_DIR={old_settings['download_base_dir']}")
                     safe_print("")
             else:
                 # 新格式（陣列）

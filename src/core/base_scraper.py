@@ -26,6 +26,8 @@ class BaseScraper:
 
     # 子類別必須覆寫此類別變數，指定環境變數名稱
     DOWNLOAD_DIR_ENV_KEY = None
+    # 子類別必須覆寫此類別變數，指定已完成下載目錄的環境變數名稱
+    DOWNLOAD_OK_DIR_ENV_KEY = None
 
     def __init__(self, username, password, headless=None):
         # 載入環境變數
@@ -59,12 +61,18 @@ class BaseScraper:
         # 從環境變數讀取下載目錄
         if self.DOWNLOAD_DIR_ENV_KEY is None:
             raise NotImplementedError("子類別必須設定 DOWNLOAD_DIR_ENV_KEY")
+        if self.DOWNLOAD_OK_DIR_ENV_KEY is None:
+            raise NotImplementedError("子類別必須設定 DOWNLOAD_OK_DIR_ENV_KEY")
 
         download_base_dir = os.getenv(self.DOWNLOAD_DIR_ENV_KEY, "downloads")
 
         # 所有檔案都放在同一層的下載目錄
         self.final_download_dir = Path(download_base_dir)
         self.final_download_dir.mkdir(parents=True, exist_ok=True)
+
+        # 從環境變數讀取已完成下載目錄（用於檢查是否已下載過）
+        ok_dir = os.getenv(self.DOWNLOAD_OK_DIR_ENV_KEY)
+        self.ok_download_dir = Path(ok_dir) if ok_dir else None
 
         # download_dir 將在每次下載時動態設定為 UUID 臨時目錄
         self.download_dir = None
@@ -77,6 +85,34 @@ class BaseScraper:
         # 確保資料夾存在
         for dir_path in [self.reports_dir, self.logs_dir, self.temp_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
+
+    # ==================== 檔案檢查方法 ====================
+
+    def is_file_already_downloaded(self, filename):
+        """
+        檢查檔案是否已存在於 WORK_DIR 或 OK_DIR 中（已下載過）
+
+        Args:
+            filename: 要檢查的檔案名稱
+
+        Returns:
+            bool: 如果檔案已存在返回 True，否則返回 False
+        """
+        # 檢查 WORK_DIR
+        if self.final_download_dir and self.final_download_dir.exists():
+            work_file = self.final_download_dir / filename
+            if work_file.exists():
+                safe_print(f"⏭️ 檔案已存在於 WORK_DIR，跳過下載: {filename}")
+                return True
+
+        # 檢查 OK_DIR
+        if self.ok_download_dir and self.ok_download_dir.exists():
+            ok_file = self.ok_download_dir / filename
+            if ok_file.exists():
+                safe_print(f"⏭️ 檔案已存在於 OK_DIR，跳過下載: {filename}")
+                return True
+
+        return False
 
     # ==================== 智慧等待方法 ====================
     # 以下方法用於替代固定 time.sleep()，提升執行效率
