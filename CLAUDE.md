@@ -115,9 +115,12 @@ PYTHONPATH="$(pwd)" uv run python -u src/scrapers/{payment|freight|unpaid}_scrap
 - **.env**: 環境設定 (CHROME_BINARY_PATH, HEADLESS, *_DOWNLOAD_DIR)，從 .env.example 建立 ⚠️ 已加入 .gitignore
   - CHROME_BINARY_PATH: Chrome 瀏覽器路徑
   - HEADLESS: 無頭模式 (true/false，預設 true)
-  - PAYMENT_DOWNLOAD_DIR: 貨到付款檔案下載目錄 (預設 downloads)
-  - FREIGHT_DOWNLOAD_DIR: 運費發票檔案下載目錄 (預設 downloads)
-  - UNPAID_DOWNLOAD_DIR: 交易明細檔案下載目錄 (預設 downloads)
+  - PAYMENT_DOWNLOAD_WORK_DIR: 貨到付款檔案下載目錄 (預設 downloads)
+  - FREIGHT_DOWNLOAD_WORK_DIR: 運費發票檔案下載目錄 (預設 downloads)
+  - UNPAID_DOWNLOAD_WORK_DIR: 交易明細檔案下載目錄 (預設 downloads)
+  - PAYMENT_DOWNLOAD_OK_DIR: 貨到付款已完成目錄（設定後跳過重複下載）
+  - FREIGHT_DOWNLOAD_OK_DIR: 運費發票已完成目錄（設定後跳過重複下載）
+  - UNPAID_DOWNLOAD_OK_DIR: 交易明細已完成目錄（設定後跳過重複下載）
   - DISCORD_WEBHOOK_URL: Discord Webhook URL，設定後會在執行完成時發送通知（可選）
   - 配置優先級: 命令列參數 > 環境變數 > 預設值
 - **pyproject.toml**: Python 專案設定、依賴管理

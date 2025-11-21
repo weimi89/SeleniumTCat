@@ -33,7 +33,8 @@ class PaymentScraper(BaseScraper):
     """
 
     # 設定環境變數 key
-    DOWNLOAD_DIR_ENV_KEY = "PAYMENT_DOWNLOAD_DIR"
+    DOWNLOAD_DIR_ENV_KEY = "PAYMENT_DOWNLOAD_WORK_DIR"
+    DOWNLOAD_OK_DIR_ENV_KEY = "PAYMENT_DOWNLOAD_OK_DIR"
 
     def __init__(self, username, password, headless=None, period_number=1):
         # 呼叫父類建構子
@@ -940,6 +941,13 @@ class PaymentScraper(BaseScraper):
     def download_cod_statement(self):
         """下載貨到付款匯款明細表"""
         safe_print("📥 開始下載貨到付款匯款明細表...")
+
+        # 檢查檔案是否已下載過（在 OK_DIR 中）
+        if self.current_settlement_period:
+            formatted_period = self.format_settlement_period_for_filename(self.current_settlement_period)
+            target_filename = f"客樂得對帳單_{self.username}_{formatted_period}.xlsx"
+            if self.is_file_already_downloaded(target_filename):
+                return []  # 跳過已下載的檔案
 
         # 設定本次下載的 UUID 臨時目錄
         self.setup_temp_download_dir()

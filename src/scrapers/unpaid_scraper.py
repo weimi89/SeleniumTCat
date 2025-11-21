@@ -33,7 +33,8 @@ class UnpaidScraper(BaseScraper):
     """
 
     # 設定環境變數 key
-    DOWNLOAD_DIR_ENV_KEY = "UNPAID_DOWNLOAD_DIR"
+    DOWNLOAD_DIR_ENV_KEY = "UNPAID_DOWNLOAD_WORK_DIR"
+    DOWNLOAD_OK_DIR_ENV_KEY = "UNPAID_DOWNLOAD_OK_DIR"
 
     def __init__(self, username, password, headless=None, days=None):
         # 呼叫父類建構子
@@ -610,6 +611,19 @@ class UnpaidScraper(BaseScraper):
     def _download_days_data_with_details(self, start_date, end_date, max_retries=3):
         """下載指定天數範圍的資料並返回詳細信息，支援重試機制"""
         safe_print(f"📥 下載資料 ({start_date} - {end_date})...")
+
+        # 檢查檔案是否已下載過（在 OK_DIR 中）
+        target_filename = f"交易明細表_{self.username}_{start_date}-{end_date}.xlsx"
+        if self.is_file_already_downloaded(target_filename):
+            return [], {
+                "days": self.days,
+                "start_date": start_date,
+                "end_date": end_date,
+                "status": "skipped",
+                "files": [],
+                "error": None,
+                "record_count": 0,
+            }
 
         days_info = {
             "days": self.days,
