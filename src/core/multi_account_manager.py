@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 
 from ..utils.windows_encoding_utils import safe_print
 from ..utils.discord_notifier import DiscordNotifier
+from ..utils.email_notifier import EmailNotifier
 
 
 class MultiAccountManager:
@@ -43,6 +44,9 @@ class MultiAccountManager:
 
         # Discord 通知器
         self.discord_notifier = DiscordNotifier()
+
+        # Email 通知器
+        self.email_notifier = EmailNotifier()
 
     def load_config(self):
         """載入設定檔"""
@@ -344,19 +348,19 @@ class MultiAccountManager:
 
         safe_print(f"\n💾 詳細報告已保存: {report_file}")
 
+        # 收集所有下載的檔案清單（供 Discord 和 Email 通知使用）
+        all_downloaded_files = []
+        for result in successful_accounts:
+            username = result.get("username", "")
+            for file_path in result.get("downloads", []):
+                # 只取檔名，不要完整路徑
+                filename = Path(file_path).name if file_path else ""
+                if filename:
+                    all_downloaded_files.append({"username": username, "filename": filename})
+
         # 發送 Discord 通知
         if self.discord_notifier.is_enabled():
             safe_print("\n📢 正在發送 Discord 通知...")
-
-            # 收集所有下載的檔案清單
-            all_downloaded_files = []
-            for result in successful_accounts:
-                username = result.get("username", "")
-                for file_path in result.get("downloads", []):
-                    # 只取檔名，不要完整路徑
-                    filename = Path(file_path).name if file_path else ""
-                    if filename:
-                        all_downloaded_files.append({"username": username, "filename": filename})
 
             # 發送執行摘要
             self.discord_notifier.send_execution_summary(
@@ -373,6 +377,40 @@ class MultiAccountManager:
             # 如果有密碼安全警告，額外發送詳細通知
             if security_warning_accounts:
                 self.discord_notifier.send_security_warning_notification(
+                    function_name=self.current_function_name or "未知功能",
+                    security_warning_accounts=security_warning_accounts,
+                )
+
+        # 發送 Email 通知
+        if self.email_notifier.is_enabled():
+            safe_print("\n📧 正在發送 Email 通知...")
+
+            # 組合失敗帳號詳情
+            failed_accounts_details = [
+                {"username": r["username"], "error": r.get("error", "未知錯誤")}
+                for r in other_failed_accounts
+            ]
+
+            # 組合執行帳號清單
+            executed_accounts = [r["username"] for r in results]
+
+            # 發送執行摘要
+            self.email_notifier.send_execution_summary(
+                function_name=self.current_function_name or "未知功能",
+                total_accounts=len(results),
+                successful_accounts=len(successful_accounts),
+                failed_accounts=len(other_failed_accounts),
+                security_warning_accounts=len(security_warning_accounts),
+                total_downloads=total_downloads,
+                total_execution_minutes=self.total_execution_minutes if hasattr(self, "total_execution_minutes") else 0,
+                downloaded_files=all_downloaded_files,
+                failed_accounts_details=failed_accounts_details,
+                executed_accounts=executed_accounts,
+            )
+
+            # 如果有密碼安全警告，額外發送詳細通知
+            if security_warning_accounts:
+                self.email_notifier.send_security_warning_notification(
                     function_name=self.current_function_name or "未知功能",
                     security_warning_accounts=security_warning_accounts,
                 )
