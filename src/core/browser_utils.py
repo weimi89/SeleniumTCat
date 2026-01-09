@@ -100,7 +100,8 @@ def init_chrome_browser(headless=False, download_dir=None):
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
-    # 初始化 Chrome 瀏覽器 (優先使用系統 Chrome)
+    # 初始化 Chrome 瀏覽器
+    # 優先使用 WebDriver Manager 以確保版本相容性
     driver = None
 
     # 方法1: 嘗試使用 .env 中設定的 ChromeDriver 路徑
@@ -113,7 +114,21 @@ def init_chrome_browser(headless=False, download_dir=None):
         except Exception as env_error:
             safe_print(f"⚠️ 指定的 ChromeDriver 路徑失敗: {env_error}")
 
-    # 方法2: 嘗試使用系統 ChromeDriver (通常最穩定)
+    # 方法2: 優先使用 WebDriver Manager（自動下載匹配版本的 ChromeDriver）
+    if not driver:
+        try:
+            # 抑制 ChromeDriverManager 的輸出
+            import logging
+
+            logging.getLogger("WDM").setLevel(logging.WARNING)
+
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+            safe_print("✅ 使用 WebDriver Manager 啟動 Chrome（自動匹配版本）")
+        except Exception as wdm_error:
+            safe_print(f"⚠️ WebDriver Manager 失敗: {wdm_error}")
+
+    # 方法3: 最後嘗試使用系統 ChromeDriver（可能有版本不匹配問題）
     if not driver:
         try:
             # 配置 Chrome Service 來隱藏輸出
@@ -126,23 +141,9 @@ def init_chrome_browser(headless=False, download_dir=None):
                 service = Service(log_path=os.devnull)
 
             driver = webdriver.Chrome(service=service, options=chrome_options)
-            safe_print("✅ 使用系統 Chrome 啟動")
+            safe_print("✅ 使用系統 ChromeDriver 啟動")
         except Exception as system_error:
-            safe_print(f"⚠️ 系統 Chrome 失敗: {system_error}")
-
-    # 方法3: 最後嘗試 WebDriver Manager (可能有架構問題)
-    if not driver:
-        try:
-            # 抑制 ChromeDriverManager 的輸出
-            import logging
-
-            logging.getLogger("WDM").setLevel(logging.WARNING)
-
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            safe_print("✅ 使用 WebDriver Manager 啟動 Chrome")
-        except Exception as wdm_error:
-            safe_print(f"⚠️ WebDriver Manager 失敗: {wdm_error}")
+            safe_print(f"⚠️ 系統 ChromeDriver 失敗: {system_error}")
 
     # 如果所有方法都失敗，拋出錯誤（平台特定的故障排除訊息）
     if not driver:

@@ -19,6 +19,13 @@ from ..utils.discord_notifier import DiscordNotifier
 class MultiAccountManager:
     """多帳號管理器"""
 
+    # Scraper 類別名稱對應中文功能名稱
+    SCRAPER_NAMES = {
+        "PaymentScraper": "貨到付款匯款明細",
+        "FreightScraper": "運費對帳單",
+        "UnpaidScraper": "交易明細表",
+    }
+
     def __init__(self, config_file="accounts.json"):
         # 載入環境變數
         load_dotenv()
@@ -30,6 +37,9 @@ class MultiAccountManager:
         self.total_start_time = None
         self.total_end_time = None
         self.total_execution_minutes = 0
+
+        # 當前執行的功能名稱
+        self.current_function_name = None
 
         # Discord 通知器
         self.discord_notifier = DiscordNotifier()
@@ -106,14 +116,39 @@ class MultiAccountManager:
         self.total_start_time = datetime.now()
         safe_print(f"⏱️ 總執行開始時間: {self.total_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
+        # 記錄當前執行的功能名稱
+        scraper_class_name = scraper_class.__name__
+        self.current_function_name = self.SCRAPER_NAMES.get(scraper_class_name, scraper_class_name)
+
         accounts = self.get_enabled_accounts()
         results = []
 
+        # 顯示全域設定（只顯示一次）
+        if headless_override is not None:
+            use_headless = headless_override
+            headless_source = f"命令列參數: {use_headless}"
+        else:
+            use_headless = None
+            env_headless = os.getenv("HEADLESS", "true").lower()
+            headless_source = f"環境變數: {env_headless}"
+
+        # 組合全域參數訊息
+        global_params = []
+        if "days" in scraper_kwargs and scraper_kwargs["days"] is not None:
+            global_params.append(f"查詢範圍: 前 {scraper_kwargs['days']} 天")
+        if "period_number" in scraper_kwargs and scraper_kwargs["period_number"] is not None:
+            global_params.append(f"查詢期數: {scraper_kwargs['period_number']} 期")
+        if scraper_kwargs.get("start_date") and scraper_kwargs.get("end_date"):
+            global_params.append(f"日期範圍: {scraper_kwargs['start_date']} - {scraper_kwargs['end_date']}")
+
         if progress_callback:
-            progress_callback(f"🚀 開始執行多帳號黑貓宅急便自動下載 (共 {len(accounts)} 個帳號)")
+            progress_callback(f"🚀 開始執行【{self.current_function_name}】(共 {len(accounts)} 個帳號)")
         else:
             print("\n" + "=" * 80)
-            safe_print(f"🚀 開始執行多帳號黑貓宅急便自動下載 (共 {len(accounts)} 個帳號)")
+            safe_print(f"🚀 開始執行【{self.current_function_name}】(共 {len(accounts)} 個帳號)")
+            safe_print(f"🔧 Headless 模式: {headless_source}")
+            for param in global_params:
+                safe_print(f"📅 {param}")
             print("=" * 80)
 
         for i, account in enumerate(accounts, 1):
@@ -128,22 +163,13 @@ class MultiAccountManager:
                 print("-" * 50)
 
             try:
-                # headless 優先級：命令列參數 > 環境變數 > 預設值
-                # headless_override 傳遞給 scraper，由 scraper 處理優先級
-                if headless_override is not None:
-                    use_headless = headless_override
-                    safe_print(f"🔧 使用命令列 headless 設定: {use_headless}")
-                else:
-                    # None 表示使用環境變數或預設值
-                    use_headless = None
-                    env_headless = os.getenv("HEADLESS", "true").lower()
-                    safe_print(f"🔧 使用環境變數 HEADLESS 設定: {env_headless}")
 
                 # 準備 scraper 基本參數
                 scraper_init_kwargs = {
                     "username": username,
                     "password": password,
                     "headless": use_headless,
+                    "quiet_init": True,  # 全域設定已在上方顯示，抑制重複訊息
                 }
 
                 # 合併額外的 scraper 參數
@@ -186,7 +212,8 @@ class MultiAccountManager:
     def generate_summary_report(self, results):
         """生成總體執行報告"""
         print("\n" + "=" * 80)
-        safe_print("📋 多帳號執行總結報告")
+        function_name = self.current_function_name or "多帳號執行"
+        safe_print(f"📋 【{function_name}】總結報告")
         print("=" * 80)
 
         successful_accounts = [r for r in results if r["success"]]
@@ -292,6 +319,7 @@ class MultiAccountManager:
         with open(report_file, "w", encoding="utf-8") as f:
             json.dump(
                 {
+                    "function_name": self.current_function_name or "未知功能",
                     "execution_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "total_start_time": (
                         self.total_start_time.strftime("%Y-%m-%d %H:%M:%S") if self.total_start_time else None
@@ -320,21 +348,33 @@ class MultiAccountManager:
         if self.discord_notifier.is_enabled():
             safe_print("\n📢 正在發送 Discord 通知...")
 
+            # 收集所有下載的檔案清單
+            all_downloaded_files = []
+            for result in successful_accounts:
+                username = result.get("username", "")
+                for file_path in result.get("downloads", []):
+                    # 只取檔名，不要完整路徑
+                    filename = Path(file_path).name if file_path else ""
+                    if filename:
+                        all_downloaded_files.append({"username": username, "filename": filename})
+
             # 發送執行摘要
             self.discord_notifier.send_execution_summary(
+                function_name=self.current_function_name or "未知功能",
                 total_accounts=len(results),
                 successful_accounts=len(successful_accounts),
                 failed_accounts=len(other_failed_accounts),
                 security_warning_accounts=len(security_warning_accounts),
                 total_downloads=total_downloads,
                 total_execution_minutes=self.total_execution_minutes if hasattr(self, "total_execution_minutes") else 0,
+                downloaded_files=all_downloaded_files,
             )
 
             # 如果有密碼安全警告，額外發送詳細通知
             if security_warning_accounts:
                 self.discord_notifier.send_security_warning_notification(
+                    function_name=self.current_function_name or "未知功能",
                     security_warning_accounts=security_warning_accounts,
-                    total_execution_minutes=self.total_execution_minutes if hasattr(self, "total_execution_minutes") else 0,
                 )
 
         print("=" * 80)
