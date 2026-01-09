@@ -171,4 +171,9 @@ cython_debug/
 .bmad-core/
 .bmad-*/
 
+tests/*
+
 .claude/settings.local.json
+.claude-sessions
+
+uv.lock
