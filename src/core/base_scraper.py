@@ -750,3 +750,302 @@ class BaseScraper:
                 safe_print(f"🗑️ 已清理臨時目錄: {temp_dir}")
         except Exception as e:
             safe_print(f"⚠️ 清理臨時目錄失敗: {e}")
+
+    # ==================== 元素搜尋輔助方法 ====================
+    # 以下方法用於通用的元素搜尋，減少子類中的重複程式碼
+
+    def find_date_inputs(self):
+        """
+        尋找頁面上的日期輸入欄位
+
+        使用多種策略尋找開始日期和結束日期輸入框。
+
+        Returns:
+            tuple: (start_date_input, end_date_input) 或 (None, None) 如果找不到
+        """
+        start_date_input = None
+        end_date_input = None
+
+        # 策略1: 使用確切的 ID (txtDateS, txtDateE)
+        try:
+            start_date_input = self.driver.find_element(By.ID, "txtDateS")
+            end_date_input = self.driver.find_element(By.ID, "txtDateE")
+            return (start_date_input, end_date_input)
+        except:
+            pass
+
+        # 策略2: 使用 NAME 屬性
+        try:
+            start_date_input = self.driver.find_element(By.NAME, "txtDateS")
+            end_date_input = self.driver.find_element(By.NAME, "txtDateE")
+            return (start_date_input, end_date_input)
+        except:
+            pass
+
+        # 策略3: 嘗試交易明細表特有的 ID
+        try:
+            start_date_input = self.driver.find_element(By.ID, "txtStartDate")
+            end_date_input = self.driver.find_element(By.ID, "txtEndDate")
+            return (start_date_input, end_date_input)
+        except:
+            pass
+
+        # 策略4: 通用搜索 - 尋找前兩個文字輸入框
+        try:
+            date_inputs = self.driver.find_elements(By.CSS_SELECTOR, "input[type='text']")
+            if len(date_inputs) >= 2:
+                return (date_inputs[0], date_inputs[1])
+        except:
+            pass
+
+        return (None, None)
+
+    def fill_date_range(self, start_date, end_date):
+        """
+        填入日期範圍到輸入欄位
+
+        Args:
+            start_date: 開始日期字串 (YYYYMMDD 格式)
+            end_date: 結束日期字串 (YYYYMMDD 格式)
+
+        Returns:
+            bool: 成功返回 True，失敗返回 False
+        """
+        start_input, end_input = self.find_date_inputs()
+
+        if not start_input or not end_input:
+            safe_print("❌ 未找到日期輸入框")
+            return False
+
+        try:
+            start_input.clear()
+            start_input.send_keys(start_date)
+            safe_print(f"✅ 已設定開始日期: {start_date}")
+
+            end_input.clear()
+            end_input.send_keys(end_date)
+            safe_print(f"✅ 已設定結束日期: {end_date}")
+
+            return True
+        except Exception as e:
+            safe_print(f"⚠️ 填入日期失敗: {e}")
+            return False
+
+    def find_search_button(self):
+        """
+        尋找頁面上的搜尋按鈕
+
+        Returns:
+            搜尋按鈕元素或 None
+        """
+        # 嘗試多種搜尋按鈕 ID
+        button_ids = ["btnSearch", "btnQuery", "lnkbtnSearch"]
+
+        for button_id in button_ids:
+            try:
+                button = self.driver.find_element(By.ID, button_id)
+                if button and button.is_displayed() and button.is_enabled():
+                    return button
+            except:
+                continue
+
+        # 備用方法: 通用 CSS 選擇器
+        try:
+            buttons = self.driver.find_elements(
+                By.CSS_SELECTOR,
+                "input[type='submit'][value*='搜'], input[type='button'][value*='搜'], button[value*='搜']"
+            )
+            for button in buttons:
+                if button.is_displayed() and button.is_enabled():
+                    return button
+        except:
+            pass
+
+        return None
+
+    def click_search_button(self):
+        """
+        點擊搜尋按鈕
+
+        Returns:
+            bool: 成功點擊返回 True，失敗返回 False
+        """
+        button = self.find_search_button()
+        if button:
+            try:
+                self.driver.execute_script("arguments[0].click();", button)
+                safe_print("✅ 已點擊搜尋按鈕")
+                return True
+            except Exception as e:
+                safe_print(f"❌ 點擊搜尋按鈕失敗: {e}")
+                return False
+        else:
+            safe_print("❌ 找不到搜尋按鈕")
+            return False
+
+    # ==================== 會話管理方法 ====================
+    # 以下方法用於處理會話超時和彈窗，在子類中共用
+
+    def _check_session_timeout(self):
+        """檢查當前頁面是否為會話超時"""
+        try:
+            current_url = self.driver.current_url
+            page_source = self.driver.page_source
+
+            # 檢查 URL 是否包含會話超時相關的訊息
+            timeout_indicators = ["MsgCenter.aspx", "系統閒置過久", "請重新登入"]
+
+            # 檢查 URL - 使用更精確的檢查
+            if any(indicator in current_url for indicator in timeout_indicators):
+                return True
+
+            # 特別檢查 TimeOut 參數，只有 TimeOut=Y 才算超時
+            if "TimeOut=Y" in current_url:
+                return True
+
+            # 檢查其他 Session 相關但排除正常情況
+            if "Session" in current_url and "SessionExpired" in current_url:
+                return True
+
+            # 檢查頁面內容
+            timeout_messages = ["系統閒置過久", "請重新登入", "Session timeout", "Session expired", "會話超時"]
+
+            if any(message in page_source for message in timeout_messages):
+                return True
+
+            return False
+
+        except Exception as e:
+            safe_print(f"❌ 檢查會話狀態時發生錯誤: {e}")
+            return False
+
+    def _handle_session_timeout(self):
+        """處理會話超時，嘗試重新登入，包含完整的錯誤恢復機制"""
+        try:
+            safe_print("🔄 處理會話超時，嘗試重新登入...")
+
+            # 清除可能的彈窗或alert
+            try:
+                alert = self.driver.switch_to.alert
+                alert.accept()
+                safe_print("   清除了一個 alert 彈窗")
+            except:
+                pass
+
+            # 確保回到主框架
+            try:
+                self.driver.switch_to.default_content()
+            except:
+                pass
+
+            # 嘗試多個登入 URL，以防某些 URL 無法存取
+            login_urls = [
+                "https://www.takkyubin.com.tw/YMTContract/Login.aspx",
+                "https://www.takkyubin.com.tw/YMTContract/",
+                "https://www.takkyubin.com.tw/YMTContract/default.aspx",
+            ]
+
+            login_success = False
+
+            for login_url in login_urls:
+                try:
+                    safe_print(f"   嘗試登入 URL: {login_url}")
+                    self.driver.get(login_url)
+                    self.smart_wait_for_url_change(timeout=5)
+
+                    current_url = self.driver.current_url
+                    safe_print(f"   導航後 URL: {current_url}")
+
+                    # 檢查是否成功到達登入頁面
+                    if "Login.aspx" in current_url or "登入" in self.driver.page_source:
+                        safe_print("   ✅ 成功到達登入頁面")
+
+                        # 重新執行登入流程
+                        login_success = self.login()
+                        if login_success:
+                            safe_print("✅ 會話超時後重新登入成功")
+
+                            # 智慧等待登入完成並驗證
+                            self.smart_wait_for_url_change(timeout=10)
+
+                            # 驗證登入是否真的成功
+                            if not self._check_session_timeout():
+                                safe_print("   ✅ 登入驗證成功，會話有效")
+                                return True
+                            else:
+                                safe_print("   ❌ 登入驗證失敗，會話仍然無效")
+                                continue
+                        else:
+                            safe_print("   ❌ 登入過程失敗")
+                            continue
+                    else:
+                        safe_print("   ❌ 未能到達登入頁面")
+                        continue
+
+                except Exception as url_e:
+                    safe_print(f"   ❌ 嘗試登入 URL 失敗: {url_e}")
+                    continue
+
+            if not login_success:
+                safe_print("❌ 所有重新登入嘗試都失敗")
+
+                # 最後嘗試：重新初始化瀏覽器會話
+                try:
+                    safe_print("🔄 嘗試重新初始化瀏覽器會話...")
+
+                    # 刪除所有 cookies
+                    self.driver.delete_all_cookies()
+
+                    # 回到首頁
+                    old_url = self.driver.current_url
+                    self.driver.get("https://www.takkyubin.com.tw/YMTContract/")
+                    self.smart_wait_for_url_change(old_url, timeout=5)
+
+                    # 再次嘗試登入
+                    final_login_success = self.login()
+                    if final_login_success:
+                        safe_print("✅ 重新初始化後登入成功")
+                        return True
+
+                except Exception as reinit_e:
+                    safe_print(f"❌ 重新初始化失敗: {reinit_e}")
+
+            return False
+
+        except Exception as e:
+            safe_print(f"❌ 處理會話超時時發生錯誤: {e}")
+            return False
+
+    def _handle_alerts(self):
+        """處理各種類型的 alert 彈窗 - 密碼安全提示會終止當前帳號"""
+        try:
+            alert = self.driver.switch_to.alert
+            alert_text = alert.text
+            safe_print(f"🔔 檢測到彈窗: {alert_text}")
+
+            # 檢查是否為密碼安全相關的嚴重警告
+            critical_keywords = ["密碼", "安全", "更新您的密碼", "為維護資訊安全"]
+
+            if any(keyword in alert_text for keyword in critical_keywords):
+                safe_print("🚨 檢測到密碼安全警告 - 終止當前帳號處理！")
+                safe_print("⛔ 請先更新此帳號密碼後再使用本工具")
+                alert.accept()  # 先關閉彈窗
+                # 設置安全警告標記
+                self.security_warning_encountered = True
+                # 返回特殊值表示需要終止當前帳號
+                return "SECURITY_WARNING"
+
+            # 對於其他非關鍵性提示，可以繼續
+            elif "系統" in alert_text:
+                safe_print("ℹ️ 系統提示 - 點擊確定繼續")
+                alert.accept()
+                return True
+            else:
+                # 對於其他類型的 alert，謹慎處理
+                safe_print(f"⚠️ 其他提示: {alert_text} - 點擊確定繼續")
+                alert.accept()
+                return True
+
+        except Exception:
+            # 沒有 alert 或其他處理失敗
+            return False
