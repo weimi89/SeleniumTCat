@@ -17,6 +17,7 @@
 🌐 **跨平台相容**: 支援 macOS、Windows、Linux 系統
 🖥️ **Windows 友善**: Unicode 字符自動轉換，完美支援中文 Windows 環境
 🔔 **Discord 通知**: 執行完成自動發送摘要通知（可選功能）
+📧 **Email 通知**: 支援 SMTP 郵件通知（可選功能）
 🔧 **ChromeDriver 自動匹配**: WebDriver Manager 自動下載匹配版本
 
 ## 專案結構
@@ -26,7 +27,7 @@ SeleniumTCat/
 ├── src/                          # 所有 Python 原始碼
 │   ├── core/                     # 核心模組
 │   │   ├── base_scraper.py       # 基礎爬蟲類別 (登入、驗證碼、智慧等待)
-│   │   ├── multi_account_manager.py  # 多帳號管理器 (批次處理、報告、通知)
+│   │   ├── multi_account_manager.py  # 多帳號管理器 (批次處理、報告、Discord/Email 通知)
 │   │   └── browser_utils.py      # 瀏覽器初始化工具 (WebDriver Manager)
 │   ├── scrapers/                 # 具體實作的爬蟲
 │   │   ├── payment_scraper.py    # 貨到付款查詢工具
@@ -35,6 +36,7 @@ SeleniumTCat/
 │   └── utils/                    # 工具模組
 │       ├── windows_encoding_utils.py  # Windows 相容性工具
 │       ├── discord_notifier.py   # Discord Webhook 通知
+│       ├── email_notifier.py     # Email SMTP 通知
 │       └── test_browser.py       # 瀏覽器環境測試
 ├── scripts/                      # 共用腳本和 PowerShell 模組
 │   ├── common_checks.ps1         # PowerShell 共用檢查函數
@@ -439,6 +441,13 @@ UNPAID_DOWNLOAD_WORK_DIR=downloads
 - `FREIGHT_DOWNLOAD_OK_DIR` - 運費發票已完成目錄（設定後跳過重複下載）
 - `UNPAID_DOWNLOAD_OK_DIR` - 交易明細已完成目錄（設定後跳過重複下載）
 - `DISCORD_WEBHOOK_URL` - Discord Webhook URL（設定後啟用通知功能）
+- `MAIL_HOST` - SMTP 伺服器位址
+- `MAIL_PORT` - SMTP 伺服器埠號（預設 587）
+- `MAIL_USERNAME` - SMTP 帳號
+- `MAIL_PASSWORD` - SMTP 密碼
+- `MAIL_ENCRYPTION` - 加密方式（tls/ssl/none，預設 tls）
+- `MAIL_FROM_ADDRESS` - 寄件人地址
+- `MAIL_TO_ADDRESS` - 收件人地址
 
 ### Discord 通知（可選功能）
 
@@ -458,6 +467,39 @@ UNPAID_DOWNLOAD_WORK_DIR=downloads
 1. Discord 伺服器設定 → 整合 → Webhook
 2. 建立新 Webhook → 複製 URL
 3. 將 URL 加入 `.env` 檔案
+
+### Email 通知（可選功能）
+
+設定 SMTP 相關環境變數後，系統會在所有帳號處理完成時自動發送 Email 通知（與 Discord 並行）：
+
+**執行摘要通知**：
+- 純文字格式，視覺化進度條 `[████████░░░░] 60%`
+- 帳號統計、下載統計、總執行時間
+- 下載檔案清單
+
+**密碼安全警告**：
+- 列出需要更新密碼的帳號
+- 含詳細處理步驟指引
+
+**常見 SMTP 設定範例**：
+
+```bash
+# Gmail（需啟用應用程式密碼）
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+MAIL_USERNAME=your-email@gmail.com
+MAIL_PASSWORD=your-app-password
+MAIL_FROM_ADDRESS=your-email@gmail.com
+MAIL_TO_ADDRESS=recipient@example.com
+
+# Outlook/Office365
+MAIL_HOST=smtp.office365.com
+MAIL_PORT=587
+MAIL_ENCRYPTION=tls
+```
+
+> **Gmail 注意事項**：建議使用「應用程式密碼」而非帳號密碼。在 Google 帳號設定中啟用兩步驟驗證後，可在「安全性」→「應用程式密碼」中產生。
 
 ## 現代化特色
 
@@ -508,6 +550,11 @@ UNPAID_DOWNLOAD_WORK_DIR=downloads
 - **執行摘要通知**: 視覺化進度條、動態狀態顏色、下載檔案清單
 - **密碼安全警告**: @here 標記、處理步驟指引
 - **功能名稱識別**: 報告和通知中清楚顯示執行的功能類型
+
+### 📧 Email 通知整合 (2026-01)
+- **執行摘要通知**: 純文字格式、進度條視覺化、檔案清單
+- **密碼安全警告**: 詳細處理步驟指引
+- **SMTP 支援**: TLS/SSL 加密、支援 Gmail/Outlook/Yahoo 等常見服務
 
 ## 技術特色
 

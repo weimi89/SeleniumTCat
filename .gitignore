@@ -177,3 +177,9 @@ tests/*
 .claude-sessions
 
 uv.lock
+
+# ======================
+# OpenSpec 和 Serena
+# ======================
+openspec/
+.serena/

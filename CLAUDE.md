@@ -31,7 +31,7 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 src/
 ├── core/           # 核心模組
 │   ├── base_scraper.py         # 基礎抓取器 (登入、驗證碼、智慧等待)
-│   ├── multi_account_manager.py # 多帳號管理 (批次處理、報告、Discord 通知)
+│   ├── multi_account_manager.py # 多帳號管理 (批次處理、報告、Discord/Email 通知)
 │   └── browser_utils.py         # Chrome WebDriver 初始化
 ├── scrapers/       # 實作模組
 │   ├── payment_scraper.py      # 貨到付款匯款明細
@@ -40,6 +40,7 @@ src/
 └── utils/          # 工具模組
     ├── windows_encoding_utils.py # Unicode 顯示相容
     ├── discord_notifier.py       # Discord Webhook 通知
+    ├── email_notifier.py         # Email SMTP 通知
     └── test_browser.py           # 瀏覽器環境測試
 
 執行腳本: {Linux|Windows}_{客樂得對帳單|發票明細|客戶交易明細|安裝|更新}.{sh|cmd}
@@ -60,6 +61,7 @@ src/
   - 功能名稱識別 (`SCRAPER_NAMES` 映射)
   - 執行報告生成 (JSON 格式)
   - Discord 通知整合 (執行摘要、密碼警告)
+  - Email 通知整合 (執行摘要、密碼警告)
 - **browser_utils**: ChromeDriver 初始化
   - 跨平台 Chrome 設定、無頭/視窗模式
   - WebDriver Manager 自動版本匹配 (優先使用)
@@ -70,6 +72,10 @@ src/
 - **discord_notifier**: Discord Webhook 通知器
   - 執行摘要通知 (進度條、狀態顏色、下載檔案清單)
   - 密碼安全警告通知 (含處理步驟)
+- **email_notifier**: Email SMTP 通知器
+  - 執行摘要通知 (純文字格式)
+  - 密碼安全警告通知 (含處理步驟)
+  - 支援 TLS/SSL 加密
 - **test_browser**: 瀏覽器環境測試工具
 
 ### src/scrapers/
@@ -93,6 +99,10 @@ src/
 - **Discord 通知** (2026-01 優化):
   - 執行摘要: 進度條視覺化、動態狀態顏色、下載檔案清單
   - 密碼安全警告: 含處理步驟指引、@here 標記
+- **Email 通知** (2026-01 新增):
+  - 執行摘要: 純文字格式、進度條視覺化
+  - 密碼安全警告: 含處理步驟指引
+  - 支援 TLS/SSL 加密、常見 SMTP 伺服器
 
 ## 開發指令
 
@@ -152,6 +162,9 @@ PYTHONPATH="$(pwd)" uv run python -u src/scrapers/{payment|freight|unpaid}_scrap
   - FREIGHT_DOWNLOAD_OK_DIR: 運費發票已完成目錄（設定後跳過重複下載）
   - UNPAID_DOWNLOAD_OK_DIR: 交易明細已完成目錄（設定後跳過重複下載）
   - DISCORD_WEBHOOK_URL: Discord Webhook URL，設定後會在執行完成時發送通知（可選）
+  - MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD: Email SMTP 設定（可選）
+  - MAIL_ENCRYPTION: 加密方式 tls/ssl/none（預設 tls）
+  - MAIL_FROM_ADDRESS/MAIL_TO_ADDRESS: 寄件人/收件人地址
   - 配置優先級: 命令列參數 > 環境變數 > 預設值
 - **pyproject.toml**: Python 專案設定、依賴管理
 
@@ -174,6 +187,25 @@ PYTHONPATH="$(pwd)" uv run python -u src/scrapers/{payment|freight|unpaid}_scrap
 測試通知功能：
 ```bash
 PYTHONPATH="$(pwd)" uv run python tests/test_discord_notifier.py
+```
+
+### Email 通知（可選功能）
+
+設定 SMTP 相關環境變數後，系統會在所有帳號處理完成時自動發送 Email 通知（與 Discord 並行）：
+
+- **執行摘要通知**:
+  - 純文字格式，視覺化進度條
+  - 帳號統計、下載統計、總執行時間
+  - 下載檔案清單
+- **密碼安全警告**: 當有帳號需要更新密碼時，發送詳細警告郵件
+
+**常見 SMTP 設定**：
+- Gmail: `MAIL_HOST=smtp.gmail.com`, `MAIL_PORT=587`, `MAIL_ENCRYPTION=tls`
+- Outlook: `MAIL_HOST=smtp.office365.com`, `MAIL_PORT=587`, `MAIL_ENCRYPTION=tls`
+
+測試通知功能：
+```bash
+PYTHONPATH="$(pwd)" uv run python tests/test_email_notifier.py
 ```
 
 ## 輸出
@@ -201,3 +233,4 @@ PYTHONPATH="$(pwd)" uv run python tests/test_discord_notifier.py
 - **多帳號輸出優化**: 全域設定只顯示一次，quiet_init 抑制重複訊息
 - **執行報告**: JSON 格式報告，含功能名稱識別、執行時間統計
 - **Discord 整合**: 可選通知功能，視覺化執行摘要和密碼警告
+- **Email 整合**: 可選 SMTP 通知，支援 TLS/SSL 加密
