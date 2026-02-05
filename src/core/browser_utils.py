@@ -7,6 +7,9 @@
 
 import sys
 import os
+import time
+import subprocess
+import signal
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -17,16 +20,88 @@ from webdriver_manager.chrome import ChromeDriverManager
 from ..utils.windows_encoding_utils import safe_print
 
 
-def init_chrome_browser(headless=False, download_dir=None):
+def _cleanup_headless_chrome():
     """
-    初始化 Chrome 瀏覽器
+    清理無頭模式的 Chrome 和 ChromeDriver 進程
+
+    只清理帶有 --headless 參數的 Chrome 進程，避免誤殺正常開啟的 Chrome 瀏覽器。
+    同時清理 chromedriver 進程。
+    """
+    is_windows = sys.platform == "win32"
+
+    try:
+        if is_windows:
+            # Windows: 使用 WMIC 查找並終止無頭 Chrome
+            # 查找帶有 --headless 參數的 chrome.exe
+            try:
+                result = subprocess.run(
+                    ['wmic', 'process', 'where',
+                     "name='chrome.exe' and commandline like '%--headless%'",
+                     'get', 'processid'],
+                    capture_output=True, text=True, timeout=10
+                )
+                for line in result.stdout.strip().split('\n')[1:]:
+                    pid = line.strip()
+                    if pid and pid.isdigit():
+                        subprocess.run(['taskkill', '/F', '/PID', pid],
+                                       capture_output=True, timeout=5)
+            except Exception:
+                pass
+
+            # 終止所有 chromedriver.exe
+            try:
+                subprocess.run(['taskkill', '/F', '/IM', 'chromedriver.exe'],
+                               capture_output=True, timeout=5)
+            except Exception:
+                pass
+        else:
+            # macOS/Linux: 使用 pgrep 和 pkill
+            # 查找並終止無頭 Chrome 進程
+            try:
+                result = subprocess.run(
+                    ['pgrep', '-f', 'chrome.*--headless'],
+                    capture_output=True, text=True, timeout=10
+                )
+                for pid in result.stdout.strip().split('\n'):
+                    if pid and pid.isdigit():
+                        try:
+                            os.kill(int(pid), signal.SIGTERM)
+                        except (ProcessLookupError, PermissionError):
+                            pass
+            except Exception:
+                pass
+
+            # 終止 chromedriver 進程
+            try:
+                subprocess.run(['pkill', '-f', 'chromedriver'],
+                               capture_output=True, timeout=5)
+            except Exception:
+                pass
+
+        # 給進程一點時間完全終止
+        time.sleep(0.5)
+
+    except Exception as e:
+        # 清理失敗不應阻止主流程
+        safe_print(f"⚠️ 進程清理時發生錯誤（可忽略）: {e}")
+
+
+def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_delay=2):
+    """
+    初始化 Chrome 瀏覽器（帶重試機制）
 
     Args:
         headless (bool): 是否使用無頭模式
         download_dir (str): 下載目錄路徑
+        max_retries (int): 最大重試次數（預設 3）
+        retry_delay (int): 基礎重試延遲秒數（實際延遲 = retry_delay * attempt）
 
     Returns:
         tuple: (driver, wait) WebDriver 實例和 WebDriverWait 實例
+
+    重試邏輯：
+    - 輪次 1：嘗試所有方法（CHROMEDRIVER_PATH → WebDriver Manager → 系統）
+    - 輪次 2+：清理無頭 Chrome 進程後重試，延遲逐次增加
     """
     safe_print("🚀 啟動瀏覽器...")
 
@@ -100,53 +175,90 @@ def init_chrome_browser(headless=False, download_dir=None):
         }
         chrome_options.add_experimental_option("prefs", prefs)
 
-    # 初始化 Chrome 瀏覽器
+    # 初始化 Chrome 瀏覽器（帶重試機制）
     # 優先使用 WebDriver Manager 以確保版本相容性
-    driver = None
-
-    # 方法1: 嘗試使用 .env 中設定的 ChromeDriver 路徑
     chromedriver_path = os.getenv("CHROMEDRIVER_PATH")
-    if chromedriver_path and os.path.exists(chromedriver_path):
-        try:
-            service = Service(chromedriver_path)
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            safe_print(f"✅ 使用指定 ChromeDriver 啟動: {chromedriver_path}")
-        except Exception as env_error:
-            safe_print(f"⚠️ 指定的 ChromeDriver 路徑失敗: {env_error}")
+    all_errors = []  # 收集所有嘗試的錯誤
 
-    # 方法2: 優先使用 WebDriver Manager（自動下載匹配版本的 ChromeDriver）
-    if not driver:
-        try:
-            # 抑制 ChromeDriverManager 的輸出
-            import logging
+    for attempt in range(1, max_retries + 1):
+        driver = None
+        attempt_errors = []
 
-            logging.getLogger("WDM").setLevel(logging.WARNING)
+        # 從第二次開始：清理進程並等待
+        if attempt > 1:
+            safe_print(f"\n🔄 第 {attempt}/{max_retries} 次重試...")
+            safe_print("🧹 清理殘留的無頭 Chrome 進程...")
+            _cleanup_headless_chrome()
+            delay = retry_delay * attempt
+            safe_print(f"⏳ 等待 {delay} 秒後重試...")
+            time.sleep(delay)
 
-            service = Service(ChromeDriverManager().install())
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            safe_print("✅ 使用 WebDriver Manager 啟動 Chrome（自動匹配版本）")
-        except Exception as wdm_error:
-            safe_print(f"⚠️ WebDriver Manager 失敗: {wdm_error}")
+        # 方法1: 嘗試使用 .env 中設定的 ChromeDriver 路徑
+        if chromedriver_path and os.path.exists(chromedriver_path):
+            try:
+                service = Service(chromedriver_path)
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                safe_print(f"✅ 使用指定 ChromeDriver 啟動: {chromedriver_path}")
+            except Exception as env_error:
+                error_msg = f"指定 ChromeDriver: {env_error}"
+                safe_print(f"⚠️ {error_msg}")
+                attempt_errors.append(error_msg)
 
-    # 方法3: 最後嘗試使用系統 ChromeDriver（可能有版本不匹配問題）
-    if not driver:
-        try:
-            # 配置 Chrome Service 來隱藏輸出
-            if sys.platform == "win32":
-                # Windows 上重導向 Chrome 輸出到 null
-                service = Service()
-                service.creation_flags = 0x08000000  # CREATE_NO_WINDOW
-            else:
-                # Linux/macOS 使用 devnull
-                service = Service(log_path=os.devnull)
+        # 方法2: 使用 WebDriver Manager（自動下載匹配版本的 ChromeDriver）
+        if not driver:
+            try:
+                # 抑制 ChromeDriverManager 的輸出
+                import logging
+                logging.getLogger("WDM").setLevel(logging.WARNING)
 
-            driver = webdriver.Chrome(service=service, options=chrome_options)
-            safe_print("✅ 使用系統 ChromeDriver 啟動")
-        except Exception as system_error:
-            safe_print(f"⚠️ 系統 ChromeDriver 失敗: {system_error}")
+                service = Service(ChromeDriverManager().install())
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                safe_print("✅ 使用 WebDriver Manager 啟動 Chrome（自動匹配版本）")
+            except Exception as wdm_error:
+                error_msg = f"WebDriver Manager: {wdm_error}"
+                safe_print(f"⚠️ {error_msg}")
+                attempt_errors.append(error_msg)
+
+        # 方法3: 最後嘗試使用系統 ChromeDriver（可能有版本不匹配問題）
+        if not driver:
+            try:
+                # 配置 Chrome Service 來隱藏輸出
+                if sys.platform == "win32":
+                    # Windows 上重導向 Chrome 輸出到 null
+                    service = Service()
+                    service.creation_flags = 0x08000000  # CREATE_NO_WINDOW
+                else:
+                    # Linux/macOS 使用 devnull
+                    service = Service(log_path=os.devnull)
+
+                driver = webdriver.Chrome(service=service, options=chrome_options)
+                safe_print("✅ 使用系統 ChromeDriver 啟動")
+            except Exception as system_error:
+                error_msg = f"系統 ChromeDriver: {system_error}"
+                safe_print(f"⚠️ {error_msg}")
+                attempt_errors.append(error_msg)
+
+        # 如果成功啟動，返回 driver 和 wait
+        if driver:
+            wait = WebDriverWait(driver, 10)
+            safe_print("✅ 瀏覽器初始化完成")
+            return driver, wait
+
+        # 記錄本次嘗試的錯誤
+        all_errors.append(f"嘗試 {attempt}: {'; '.join(attempt_errors)}")
+
+    # 所有重試都失敗，輸出詳細診斷資訊
+    safe_print("\n" + "=" * 60)
+    safe_print("❌ 所有 Chrome 啟動嘗試都失敗了！")
+    safe_print("=" * 60)
+    safe_print("\n📋 錯誤摘要:")
+    for error in all_errors:
+        safe_print(f"   • {error}")
+    safe_print("")
 
     # 如果所有方法都失敗，拋出錯誤（平台特定的故障排除訊息）
-    if not driver:
+    error_occurred = True
+    if error_occurred:
         error_msg = "❌ 所有 Chrome 啟動方法都失敗了！請檢查 Chrome 安裝或環境設定"
         safe_print(error_msg)
         safe_print("\n請依據您的作業系統檢查以下項目:\n")
@@ -210,10 +322,5 @@ def init_chrome_browser(headless=False, download_dir=None):
             print("   2. 下載對應的 ChromeDriver")
             print("   3. 設定 .env 檔案中的路徑")
 
+        error_msg = f"❌ 所有 Chrome 啟動方法都失敗了（共嘗試 {max_retries} 輪）！請檢查 Chrome 安裝或環境設定"
         raise RuntimeError(error_msg)
-
-    # 創建 WebDriverWait 實例
-    wait = WebDriverWait(driver, 10)
-    safe_print("✅ 瀏覽器初始化完成")
-
-    return driver, wait
