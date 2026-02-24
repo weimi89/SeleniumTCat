@@ -206,6 +206,7 @@ class EmailNotifier:
         downloaded_files: Optional[List[Dict]] = None,
         failed_accounts_details: Optional[List[Dict]] = None,
         executed_accounts: Optional[List[str]] = None,
+        no_download_accounts: Optional[List[str]] = None,
     ) -> bool:
         """
         發送執行摘要通知
@@ -221,6 +222,7 @@ class EmailNotifier:
             downloaded_files: 下載的檔案清單 [{"username": "...", "filename": "..."}]
             failed_accounts_details: 失敗帳號詳情 [{"username": "...", "error": "..."}]
             executed_accounts: 執行的帳號清單 ["username1", "username2", ...]
+            no_download_accounts: 無需下載的帳號清單（檔案已存在或無資料）
 
         Returns:
             bool: 是否成功發送
@@ -234,6 +236,8 @@ class EmailNotifier:
             failed_accounts_details = []
         if executed_accounts is None:
             executed_accounts = []
+        if no_download_accounts is None:
+            no_download_accounts = []
 
         # 計算成功率
         success_rate = (
@@ -266,6 +270,9 @@ class EmailNotifier:
         # 建立失敗帳號對照表
         failed_usernames = {d.get("username"): d.get("error", "未知錯誤") for d in failed_accounts_details}
 
+        # 建立無需下載帳號集合
+        no_download_set = set(no_download_accounts)
+
         # 組合執行帳號清單（含狀態）
         account_list_parts = []
         if executed_accounts:
@@ -273,6 +280,8 @@ class EmailNotifier:
                 if username in failed_usernames:
                     error = failed_usernames[username]
                     account_list_parts.append(f"  ❌ {username} - {error}")
+                elif username in no_download_set:
+                    account_list_parts.append(f"  ⏭️ {username} - 無需下載（檔案已存在或無資料）")
                 else:
                     account_list_parts.append(f"  ✅ {username}")
         account_list_text = "\n".join(account_list_parts) if account_list_parts else "  (無)"

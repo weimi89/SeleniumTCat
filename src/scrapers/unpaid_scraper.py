@@ -433,6 +433,8 @@ class UnpaidScraper(BaseScraper):
             if days_result["files"]:
                 downloaded_files.extend(days_result["files"])
                 safe_print(f"✅ 前 {self.days} 天下載完成: {len(days_result['files'])} 個檔案")
+            elif days_result["status"] == "skipped":
+                safe_print(f"⏭️ 前 {self.days} 天檔案已存在，跳過下載 ({start_date} - {end_date})")
             elif days_result["status"] == "no_records":
                 safe_print(f"⚠️ 前 {self.days} 天無交易記錄 ({start_date} - {end_date})")
             else:
@@ -452,7 +454,7 @@ class UnpaidScraper(BaseScraper):
         # 檢查檔案是否已下載過（在 OK_DIR 中）
         target_filename = f"交易明細表_{self.username}_{start_date}-{end_date}.xlsx"
         if self.is_file_already_downloaded(target_filename):
-            return [], {
+            return {
                 "days": self.days,
                 "start_date": start_date,
                 "end_date": end_date,

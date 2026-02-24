@@ -399,6 +399,12 @@ class MultiAccountManager:
             # 組合執行帳號清單
             executed_accounts = [r["username"] for r in results]
 
+            # 組合無需下載帳號清單（成功但無檔案下載的帳號）
+            no_download_accounts = [
+                r["username"] for r in successful_accounts
+                if not r["downloads"] and r.get("message")
+            ]
+
             # 發送執行摘要
             self.email_notifier.send_execution_summary(
                 function_name=self.current_function_name or "未知功能",
@@ -411,6 +417,7 @@ class MultiAccountManager:
                 downloaded_files=all_downloaded_files,
                 failed_accounts_details=failed_accounts_details,
                 executed_accounts=executed_accounts,
+                no_download_accounts=no_download_accounts,
             )
 
             # 如果有密碼安全警告，額外發送詳細通知

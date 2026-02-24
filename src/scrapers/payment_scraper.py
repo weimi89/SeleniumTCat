@@ -1221,15 +1221,19 @@ class PaymentScraper(BaseScraper):
 
             if downloaded_files:
                 safe_print(f"🎉 帳號 {self.username} 自動化流程完成！下載了 {len(downloaded_files)} 個檔案")
-                success = True
+                return {
+                    "success": True,
+                    "username": self.username,
+                    "downloads": [str(f) for f in downloaded_files],
+                }
             else:
                 safe_print(f"⚠️ 帳號 {self.username} 沒有下載到任何檔案")
-
-            return {
-                "success": success,
-                "username": self.username,
-                "downloads": [str(f) for f in downloaded_files],  # 轉換 PosixPath 為字串
-            }
+                return {
+                    "success": True,
+                    "username": self.username,
+                    "message": "無資料可下載",
+                    "downloads": [],
+                }
 
         except Exception as e:
             safe_print(f"💥 帳號 {self.username} 流程執行失敗: {e}")
