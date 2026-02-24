@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from ..utils.windows_encoding_utils import safe_print
 from ..utils.discord_notifier import DiscordNotifier
 from ..utils.email_notifier import EmailNotifier
+from .browser_utils import _cleanup_headless_chrome, cleanup_temp_user_data_dirs
 
 
 class MultiAccountManager:
@@ -167,6 +168,10 @@ class MultiAccountManager:
                 print("-" * 50)
 
             try:
+                # 主動清理前一個帳號可能殘留的 Chrome 進程和臨時檔案
+                if i > 1:
+                    _cleanup_headless_chrome()
+                    cleanup_temp_user_data_dirs()
 
                 # 準備 scraper 基本參數
                 scraper_init_kwargs = {

@@ -17,7 +17,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from .browser_utils import init_chrome_browser
+from .browser_utils import init_chrome_browser, cleanup_temp_user_data_dirs
 from ..utils.windows_encoding_utils import safe_print
 
 
@@ -615,10 +615,18 @@ class BaseScraper:
             return False
 
     def close(self):
-        """關閉瀏覽器"""
+        """關閉瀏覽器並清理臨時資源"""
         if self.driver:
-            self.driver.quit()
+            try:
+                self.driver.quit()
+            except Exception as e:
+                safe_print(f"⚠️ 關閉瀏覽器時發生錯誤: {e}")
+            finally:
+                self.driver = None
             safe_print("🔚 瀏覽器已關閉")
+
+        # 清理 Chrome 臨時 user-data-dir
+        cleanup_temp_user_data_dirs()
 
     def start_execution_timer(self):
         """開始執行時間計時"""

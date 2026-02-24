@@ -8,6 +8,8 @@
 import sys
 import os
 import time
+import tempfile
+import shutil
 import subprocess
 import signal
 from selenium import webdriver
@@ -18,6 +20,9 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 # 導入 Windows 編碼處理工具
 from ..utils.windows_encoding_utils import safe_print
+
+# 追蹤所有建立的臨時 user-data-dir，供清理使用
+_temp_user_data_dirs = []
 
 
 def _cleanup_headless_chrome():
@@ -86,6 +91,18 @@ def _cleanup_headless_chrome():
         safe_print(f"⚠️ 進程清理時發生錯誤（可忽略）: {e}")
 
 
+def cleanup_temp_user_data_dirs():
+    """清理所有建立的臨時 user-data-dir 目錄"""
+    global _temp_user_data_dirs
+    for dir_path in _temp_user_data_dirs:
+        try:
+            if os.path.exists(dir_path):
+                shutil.rmtree(dir_path, ignore_errors=True)
+        except Exception:
+            pass
+    _temp_user_data_dirs.clear()
+
+
 def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_delay=2):
     """
     初始化 Chrome 瀏覽器（帶重試機制）
@@ -100,9 +117,12 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
         tuple: (driver, wait) WebDriver 實例和 WebDriverWait 實例
 
     重試邏輯：
+    - 每次嘗試前：清理殘留 Chrome 進程 + 使用獨立 user-data-dir
     - 輪次 1：嘗試所有方法（CHROMEDRIVER_PATH → WebDriver Manager → 系統）
-    - 輪次 2+：清理無頭 Chrome 進程後重試，延遲逐次增加
+    - 輪次 2+：增加等待延遲後重試
     """
+    global _temp_user_data_dirs
+
     safe_print("🚀 啟動瀏覽器...")
 
     # 偵測作業系統平台
@@ -110,70 +130,8 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
     is_windows = sys.platform == "win32"
     is_macos = sys.platform == "darwin"
 
-    # Chrome 選項設定
-    chrome_options = Options()
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--window-size=1280,720")
-
-    # 隱藏 Chrome 警告訊息
-    chrome_options.add_argument("--disable-logging")
-    chrome_options.add_argument("--log-level=3")
-    chrome_options.add_argument("--silent")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-gpu-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--remote-debugging-port=0")  # 隱藏 DevTools listening 訊息
-    chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
-    chrome_options.add_experimental_option("useAutomationExtension", False)
-
-    # 設定自動下載權限，避免下載多個檔案時的權限提示
-    chrome_options.add_argument("--allow-running-insecure-content")
-    chrome_options.add_argument("--disable-web-security")
-    chrome_options.add_argument("--disable-features=TranslateUI")
-    chrome_options.add_argument("--disable-iframes-during-prerender")
-
-    # Linux/Ubuntu 環境專屬優化（降低記憶體和 CPU 使用）
-    if is_linux:
-        chrome_options.add_argument("--disable-features=VizDisplayCompositor")  # 節省記憶體 ~80MB
-        chrome_options.add_argument("--disable-software-rasterizer")  # 節省 CPU ~15%
-        chrome_options.add_argument("--disable-gpu")  # 伺服器通常無 GPU
-        safe_print("🐧 Ubuntu/Linux 環境偵測: 已套用記憶體優化參數")
-    else:
-        # 非 Linux 環境也禁用 VizDisplayCompositor
-        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-
-    # 如果設定為無頭模式，添加 headless 參數
-    if headless:
-        chrome_options.add_argument("--headless")
-        safe_print("🔇 使用無頭模式（不顯示瀏覽器視窗）")
-    else:
-        safe_print("🖥️ 使用視窗模式（顯示瀏覽器）")
-
     # 從環境變數讀取 Chrome 路徑（跨平台設定）
     chrome_binary_path = os.getenv("CHROME_BINARY_PATH")
-    if chrome_binary_path:
-        # 驗證路徑是否存在
-        if os.path.exists(chrome_binary_path):
-            chrome_options.binary_location = chrome_binary_path
-            safe_print(f"🌐 使用指定 Chrome 路徑: {chrome_binary_path}")
-        else:
-            safe_print(f"⚠️ 警告: CHROME_BINARY_PATH 指定的路徑不存在: {chrome_binary_path}")
-            safe_print("   將嘗試使用系統預設 Chrome")
-    else:
-        safe_print("⚠️ 未設定 CHROME_BINARY_PATH 環境變數，使用系統預設 Chrome")
-
-    # 設定下載路徑
-    if download_dir:
-        prefs = {
-            "download.default_directory": str(download_dir),
-            "download.prompt_for_download": False,
-            "download.directory_upgrade": True,
-            "safebrowsing.enabled": True,
-            "profile.default_content_setting_values.automatic_downloads": 1,  # 允許多個檔案自動下載
-            "profile.content_settings.exceptions.automatic_downloads.*.setting": 1,  # 允許自動下載
-        }
-        chrome_options.add_experimental_option("prefs", prefs)
 
     # 初始化 Chrome 瀏覽器（帶重試機制）
     # 優先使用 WebDriver Manager 以確保版本相容性
@@ -184,14 +142,93 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
         driver = None
         attempt_errors = []
 
-        # 從第二次開始：清理進程並等待
-        if attempt > 1:
+        # 每次嘗試前都清理殘留進程（包括第一次）
+        if attempt == 1:
+            safe_print("🧹 清理殘留的 Chrome/ChromeDriver 進程...")
+        else:
             safe_print(f"\n🔄 第 {attempt}/{max_retries} 次重試...")
-            safe_print("🧹 清理殘留的無頭 Chrome 進程...")
-            _cleanup_headless_chrome()
+            safe_print("🧹 清理殘留的 Chrome/ChromeDriver 進程...")
+        _cleanup_headless_chrome()
+
+        if attempt > 1:
             delay = retry_delay * attempt
             safe_print(f"⏳ 等待 {delay} 秒後重試...")
             time.sleep(delay)
+
+        # 為每次嘗試建立獨立的 user-data-dir，避免 profile lock 衝突
+        temp_user_data_dir = tempfile.mkdtemp(prefix="selenium_chrome_")
+        _temp_user_data_dirs.append(temp_user_data_dir)
+
+        # 每次嘗試都重新建立 Chrome 選項（因為 user-data-dir 不同）
+        chrome_options = Options()
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--window-size=1280,720")
+
+        # 使用獨立的 user-data-dir，避免 Chrome profile lock 衝突
+        chrome_options.add_argument(f"--user-data-dir={temp_user_data_dir}")
+
+        # 隱藏 Chrome 警告訊息
+        chrome_options.add_argument("--disable-logging")
+        chrome_options.add_argument("--log-level=3")
+        chrome_options.add_argument("--silent")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-gpu-sandbox")
+        chrome_options.add_argument("--remote-debugging-port=0")  # 隱藏 DevTools listening 訊息
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        chrome_options.add_experimental_option("useAutomationExtension", False)
+
+        # 設定自動下載權限，避免下載多個檔案時的權限提示
+        chrome_options.add_argument("--allow-running-insecure-content")
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--disable-features=TranslateUI")
+        chrome_options.add_argument("--disable-iframes-during-prerender")
+
+        # Linux/Ubuntu 環境專屬優化（降低記憶體和 CPU 使用）
+        if is_linux:
+            chrome_options.add_argument("--disable-features=VizDisplayCompositor")  # 節省記憶體 ~80MB
+            chrome_options.add_argument("--disable-software-rasterizer")  # 節省 CPU ~15%
+            chrome_options.add_argument("--disable-gpu")  # 伺服器通常無 GPU
+            if attempt == 1:
+                safe_print("🐧 Ubuntu/Linux 環境偵測: 已套用記憶體優化參數")
+        else:
+            # 非 Linux 環境也禁用 VizDisplayCompositor
+            chrome_options.add_argument("--disable-features=VizDisplayCompositor")
+
+        # 如果設定為無頭模式，添加 headless 參數
+        if headless:
+            chrome_options.add_argument("--headless")
+            if attempt == 1:
+                safe_print("🔇 使用無頭模式（不顯示瀏覽器視窗）")
+        else:
+            if attempt == 1:
+                safe_print("🖥️ 使用視窗模式（顯示瀏覽器）")
+
+        # 設定 Chrome 路徑
+        if chrome_binary_path:
+            if os.path.exists(chrome_binary_path):
+                chrome_options.binary_location = chrome_binary_path
+                if attempt == 1:
+                    safe_print(f"🌐 使用指定 Chrome 路徑: {chrome_binary_path}")
+            else:
+                if attempt == 1:
+                    safe_print(f"⚠️ 警告: CHROME_BINARY_PATH 指定的路徑不存在: {chrome_binary_path}")
+                    safe_print("   將嘗試使用系統預設 Chrome")
+        else:
+            if attempt == 1:
+                safe_print("⚠️ 未設定 CHROME_BINARY_PATH 環境變數，使用系統預設 Chrome")
+
+        # 設定下載路徑
+        if download_dir:
+            prefs = {
+                "download.default_directory": str(download_dir),
+                "download.prompt_for_download": False,
+                "download.directory_upgrade": True,
+                "safebrowsing.enabled": True,
+                "profile.default_content_setting_values.automatic_downloads": 1,  # 允許多個檔案自動下載
+                "profile.content_settings.exceptions.automatic_downloads.*.setting": 1,  # 允許自動下載
+            }
+            chrome_options.add_experimental_option("prefs", prefs)
 
         # 方法1: 嘗試使用 .env 中設定的 ChromeDriver 路徑
         if chromedriver_path and os.path.exists(chromedriver_path):
@@ -243,6 +280,14 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
             wait = WebDriverWait(driver, 10)
             safe_print("✅ 瀏覽器初始化完成")
             return driver, wait
+
+        # 本次失敗，清理剛建立的臨時目錄
+        try:
+            if os.path.exists(temp_user_data_dir):
+                shutil.rmtree(temp_user_data_dir, ignore_errors=True)
+                _temp_user_data_dirs.remove(temp_user_data_dir)
+        except (ValueError, Exception):
+            pass
 
         # 記錄本次嘗試的錯誤
         all_errors.append(f"嘗試 {attempt}: {'; '.join(attempt_errors)}")
