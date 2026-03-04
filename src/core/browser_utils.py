@@ -27,21 +27,21 @@ _temp_user_data_dirs = []
 
 def _cleanup_headless_chrome():
     """
-    清理無頭模式的 Chrome 和 ChromeDriver 進程
+    清理 Selenium 相關的 Chrome 和 ChromeDriver 進程
 
-    只清理帶有 --headless 參數的 Chrome 進程，避免誤殺正常開啟的 Chrome 瀏覽器。
-    同時清理 chromedriver 進程。
+    只清理帶有 --user-data-dir=.*selenium 參數的 Chrome 進程（由本工具啟動的），
+    避免誤殺使用者正常開啟的 Chrome 瀏覽器。同時清理 chromedriver 進程。
     """
     is_windows = sys.platform == "win32"
 
     try:
         if is_windows:
-            # Windows: 使用 WMIC 查找並終止無頭 Chrome
-            # 查找帶有 --headless 參數的 chrome.exe
+            # Windows: 使用 WMIC 查找並終止 Selenium Chrome
+            # 查找帶有 selenium 臨時目錄的 chrome.exe
             try:
                 result = subprocess.run(
                     ['wmic', 'process', 'where',
-                     "name='chrome.exe' and commandline like '%--headless%'",
+                     "name='chrome.exe' and commandline like '%selenium_chrome_%'",
                      'get', 'processid'],
                     capture_output=True, text=True, timeout=10
                 )
@@ -61,17 +61,28 @@ def _cleanup_headless_chrome():
                 pass
         else:
             # macOS/Linux: 使用 pgrep 和 pkill
-            # 查找並終止無頭 Chrome 進程
+            # 查找並終止 Selenium 啟動的 Chrome 進程（匹配 selenium_chrome_ 臨時目錄）
             try:
                 result = subprocess.run(
-                    ['pgrep', '-f', 'chrome.*--headless'],
+                    ['pgrep', '-f', 'chrome.*selenium_chrome_'],
                     capture_output=True, text=True, timeout=10
                 )
-                for pid in result.stdout.strip().split('\n'):
-                    if pid and pid.isdigit():
+                pids = [pid.strip() for pid in result.stdout.strip().split('\n') if pid.strip().isdigit()]
+
+                for pid in pids:
+                    try:
+                        os.kill(int(pid), signal.SIGTERM)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+
+                # macOS 上等待 SIGTERM 生效，仍存在則 SIGKILL
+                if pids:
+                    time.sleep(1)
+                    for pid in pids:
                         try:
-                            os.kill(int(pid), signal.SIGTERM)
-                        except (ProcessLookupError, PermissionError):
+                            os.kill(int(pid), 0)  # 檢查進程是否仍存在
+                            os.kill(int(pid), signal.SIGKILL)
+                        except (ProcessLookupError, PermissionError, OSError):
                             pass
             except Exception:
                 pass
@@ -184,11 +195,18 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
         chrome_options.add_argument("--disable-features=TranslateUI")
         chrome_options.add_argument("--disable-iframes-during-prerender")
 
+        # 跨平台穩定性選項
+        chrome_options.add_argument("--disable-gpu")              # 防止 GPU 相關崩潰
+        chrome_options.add_argument("--disable-hang-monitor")     # 防止未回應偵測導致終止
+        chrome_options.add_argument("--disable-sync")             # 禁用 Chrome 同步
+        chrome_options.add_argument("--disable-popup-blocking")   # 防止彈出窗口干擾
+        chrome_options.add_argument("--no-first-run")             # 跳過首次運行設定
+        chrome_options.add_argument("--disable-component-update") # 防止背景更新干擾
+
         # Linux/Ubuntu 環境專屬優化（降低記憶體和 CPU 使用）
         if is_linux:
             chrome_options.add_argument("--disable-features=VizDisplayCompositor")  # 節省記憶體 ~80MB
             chrome_options.add_argument("--disable-software-rasterizer")  # 節省 CPU ~15%
-            chrome_options.add_argument("--disable-gpu")  # 伺服器通常無 GPU
             if attempt == 1:
                 safe_print("🐧 Ubuntu/Linux 環境偵測: 已套用記憶體優化參數")
         else:
@@ -275,8 +293,12 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
                 safe_print(f"⚠️ {error_msg}")
                 attempt_errors.append(error_msg)
 
-        # 如果成功啟動，返回 driver 和 wait
+        # 如果成功啟動，設定超時並返回 driver 和 wait
         if driver:
+            # 設定 WebDriver 超時，防止 Chrome 無限期掛起後崩潰
+            driver.set_page_load_timeout(60)   # 頁面載入超時 60 秒
+            driver.set_script_timeout(30)      # 腳本執行超時 30 秒
+
             wait = WebDriverWait(driver, 10)
             safe_print("✅ 瀏覽器初始化完成")
             return driver, wait

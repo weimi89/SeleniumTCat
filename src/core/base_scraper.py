@@ -17,7 +17,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from .browser_utils import init_chrome_browser, cleanup_temp_user_data_dirs
+from .browser_utils import init_chrome_browser, cleanup_temp_user_data_dirs, _cleanup_headless_chrome
 from ..utils.windows_encoding_utils import safe_print
 
 
@@ -621,6 +621,8 @@ class BaseScraper:
                 self.driver.quit()
             except Exception as e:
                 safe_print(f"⚠️ 關閉瀏覽器時發生錯誤: {e}")
+                # quit() 失敗時強制清理殘留 Chrome 進程
+                _cleanup_headless_chrome()
             finally:
                 self.driver = None
             safe_print("🔚 瀏覽器已關閉")

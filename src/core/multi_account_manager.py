@@ -156,6 +156,8 @@ class MultiAccountManager:
                 safe_print(f"📅 {param}")
             print("=" * 80)
 
+        max_account_retries = 2  # 每個帳號最多重試 2 次（共 3 次嘗試）
+
         for i, account in enumerate(accounts, 1):
             username = account["username"]
             password = account["password"]
@@ -167,44 +169,66 @@ class MultiAccountManager:
                 print(f"\n{progress_msg}")
                 print("-" * 50)
 
-            try:
-                # 主動清理前一個帳號可能殘留的 Chrome 進程和臨時檔案
-                if i > 1:
-                    _cleanup_headless_chrome()
-                    cleanup_temp_user_data_dirs()
+            # 主動清理前一個帳號可能殘留的 Chrome 進程和臨時檔案
+            if i > 1:
+                _cleanup_headless_chrome()
+                cleanup_temp_user_data_dirs()
 
-                # 準備 scraper 基本參數
-                scraper_init_kwargs = {
-                    "username": username,
-                    "password": password,
-                    "headless": use_headless,
-                    "quiet_init": True,  # 全域設定已在上方顯示，抑制重複訊息
-                }
+            # 準備 scraper 基本參數
+            scraper_init_kwargs = {
+                "username": username,
+                "password": password,
+                "headless": use_headless,
+                "quiet_init": True,  # 全域設定已在上方顯示，抑制重複訊息
+            }
 
-                # 合併額外的 scraper 參數
-                scraper_init_kwargs.update(scraper_kwargs)
+            # 合併額外的 scraper 參數
+            scraper_init_kwargs.update(scraper_kwargs)
 
-                scraper = scraper_class(**scraper_init_kwargs)
+            # 帳號執行（含連線錯誤重試）
+            for retry in range(max_account_retries + 1):
+                try:
+                    scraper = scraper_class(**scraper_init_kwargs)
+                    result = scraper.run_full_process()
 
-                result = scraper.run_full_process()
+                    # 將時間統計添加到結果中
+                    execution_summary = scraper.get_execution_summary()
+                    result.update(execution_summary)
 
-                # 將時間統計添加到結果中
-                execution_summary = scraper.get_execution_summary()
-                result.update(execution_summary)
+                    results.append(result)
+                    break  # 成功則跳出重試迴圈
 
-                results.append(result)
+                except Exception as e:
+                    error_str = str(e)
+                    is_connection_error = any(kw in error_str for kw in [
+                        'RemoteDisconnected', 'Connection aborted',
+                        'ConnectionResetError', 'MaxRetryError',
+                        'ConnectionRefusedError', 'NewConnectionError',
+                    ])
 
-                # 帳號間隔等待 (保留此處固定等待)
-                # 原因: 避免連續請求過於頻繁導致伺服器限制或封鎖
-                # 此等待是有意的速率限制 (rate limiting)，不應優化移除
-                if i < len(accounts):
-                    safe_print("⏳ 等待 3 秒後處理下一個帳號...")
-                    time.sleep(3)
+                    if is_connection_error and retry < max_account_retries:
+                        retry_delay = 5 * (retry + 1)
+                        safe_print(f"⚠️ 帳號 {username} 連線中斷 (第 {retry + 1} 次)，{retry_delay} 秒後重試...")
+                        safe_print(f"   錯誤: {error_str[:100]}")
+                        _cleanup_headless_chrome()
+                        cleanup_temp_user_data_dirs()
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        # 非連線錯誤或重試用盡，記錄失敗
+                        if is_connection_error and retry >= max_account_retries:
+                            safe_print(f"💥 帳號 {username} 連線重試 {max_account_retries} 次後仍失敗: {e}")
+                        else:
+                            safe_print(f"💥 帳號 {username} 處理失敗: {e}")
+                        results.append({"success": False, "username": username, "error": error_str, "downloads": []})
+                        break
 
-            except Exception as e:
-                safe_print(f"💥 帳號 {username} 處理失敗: {e}")
-                results.append({"success": False, "username": username, "error": str(e), "downloads": []})
-                continue
+            # 帳號間隔等待 (保留此處固定等待)
+            # 原因: 避免連續請求過於頻繁導致伺服器限制或封鎖
+            # 此等待是有意的速率限制 (rate limiting)，不應優化移除
+            if i < len(accounts):
+                safe_print("⏳ 等待 3 秒後處理下一個帳號...")
+                time.sleep(3)
 
         # 結束總執行時間計時
         self.total_end_time = datetime.now()
