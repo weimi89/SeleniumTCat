@@ -135,6 +135,16 @@ class PaymentScraper(BaseScraper):
                         safe_print(f"❌ 重置會話失敗: {reset_e}")
 
             except Exception as e:
+                error_str = str(e)
+                # 檢測 Chrome 連線已中斷，直接向上拋出讓外層重試
+                connection_keywords = [
+                    'Connection refused', 'NewConnectionError',
+                    'ConnectionResetError', 'RemoteDisconnected',
+                    'Connection aborted', 'MaxRetryError',
+                ]
+                if any(kw in error_str for kw in connection_keywords):
+                    safe_print(f"💀 Chrome 連線已中斷，停止導航重試")
+                    raise
                 safe_print(f"❌ 第 {attempt + 1} 次導航嘗試失敗: {e}")
                 if attempt < max_attempts - 1:
                     continue
@@ -538,10 +548,21 @@ class PaymentScraper(BaseScraper):
                         break  # 跳出重試循環，嘗試下一個 URL
 
                 except Exception as url_e:
+                    error_str = str(url_e)
                     print(f"   ❌ URL 導航失敗 (嘗試 {retry + 1}): {url_e}")
 
+                    # 檢測 Chrome/ChromeDriver 進程已崩潰的連線錯誤
+                    connection_error_keywords = [
+                        'Connection refused', 'NewConnectionError',
+                        'ConnectionResetError', 'RemoteDisconnected',
+                        'Connection aborted', 'MaxRetryError',
+                    ]
+                    if any(kw in error_str for kw in connection_error_keywords):
+                        print("   💀 Chrome 連線已中斷，停止重試")
+                        raise  # 向上拋出，讓外層重試機制處理
+
                     # 檢查是否為 alert 相關的異常
-                    if "alert" in str(url_e).lower() or "unexpected alert" in str(url_e).lower():
+                    if "alert" in error_str.lower() or "unexpected alert" in error_str.lower():
                         # 嘗試處理 alert
                         alert_result = self._handle_alerts()
                         if alert_result == "SECURITY_WARNING":
