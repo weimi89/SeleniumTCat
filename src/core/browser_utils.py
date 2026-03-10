@@ -62,23 +62,24 @@ def _cleanup_headless_chrome():
         else:
             # macOS/Linux: 使用 pgrep 和 pkill
             # 查找並終止 Selenium 啟動的 Chrome 進程（匹配 selenium_chrome_ 臨時目錄）
+            selenium_pids = []
             try:
                 result = subprocess.run(
-                    ['pgrep', '-f', 'chrome.*selenium_chrome_'],
+                    ['pgrep', '-f', 'selenium_chrome_'],
                     capture_output=True, text=True, timeout=10
                 )
-                pids = [pid.strip() for pid in result.stdout.strip().split('\n') if pid.strip().isdigit()]
+                selenium_pids = [pid.strip() for pid in result.stdout.strip().split('\n') if pid.strip().isdigit()]
 
-                for pid in pids:
+                for pid in selenium_pids:
                     try:
                         os.kill(int(pid), signal.SIGTERM)
                     except (ProcessLookupError, PermissionError):
                         pass
 
                 # macOS 上等待 SIGTERM 生效，仍存在則 SIGKILL
-                if pids:
+                if selenium_pids:
                     time.sleep(1)
-                    for pid in pids:
+                    for pid in selenium_pids:
                         try:
                             os.kill(int(pid), 0)  # 檢查進程是否仍存在
                             os.kill(int(pid), signal.SIGKILL)
@@ -93,6 +94,36 @@ def _cleanup_headless_chrome():
                                capture_output=True, timeout=5)
             except Exception:
                 pass
+
+            # 清理可能殘留的 Chrome Helper 子進程（無 selenium_chrome_ 關鍵字但為孤兒進程）
+            # 只在有 Selenium Chrome 被清理時才執行，避免誤殺使用者正常的 Chrome
+            if selenium_pids:
+                try:
+                    # 找出所有 Chrome Helper 進程，檢查其父進程是否已不存在（孤兒進程）
+                    result = subprocess.run(
+                        ['pgrep', '-f', 'Google Chrome Helper'],
+                        capture_output=True, text=True, timeout=10
+                    )
+                    helper_pids = [pid.strip() for pid in result.stdout.strip().split('\n') if pid.strip().isdigit()]
+
+                    for pid in helper_pids:
+                        try:
+                            # 檢查父進程是否存在，若父進程已死則為孤兒
+                            ppid_result = subprocess.run(
+                                ['ps', '-o', 'ppid=', '-p', pid],
+                                capture_output=True, text=True, timeout=5
+                            )
+                            ppid = ppid_result.stdout.strip()
+                            if ppid and ppid.isdigit():
+                                try:
+                                    os.kill(int(ppid), 0)  # 檢查父進程是否存在
+                                except ProcessLookupError:
+                                    # 父進程已死，這是孤兒 Helper，終止它
+                                    os.kill(int(pid), signal.SIGKILL)
+                        except (ProcessLookupError, PermissionError, OSError, subprocess.TimeoutExpired):
+                            pass
+                except Exception:
+                    pass
 
         # 給進程一點時間完全終止
         time.sleep(0.5)

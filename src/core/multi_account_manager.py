@@ -174,6 +174,11 @@ class MultiAccountManager:
                 _cleanup_headless_chrome()
                 cleanup_temp_user_data_dirs()
 
+                # 批次冷卻：每 5 個帳號額外等待，讓系統釋放資源（port、記憶體）
+                if (i - 1) % 5 == 0:
+                    safe_print("🧊 批次冷卻：等待 5 秒讓系統釋放資源...")
+                    time.sleep(5)
+
             # 準備 scraper 基本參數
             scraper_init_kwargs = {
                 "username": username,
@@ -205,19 +210,22 @@ class MultiAccountManager:
                         'ConnectionResetError', 'MaxRetryError',
                         'ConnectionRefusedError', 'NewConnectionError',
                     ])
+                    is_chrome_startup_error = '所有 Chrome 啟動方法都失敗了' in error_str
+                    is_retryable = is_connection_error or is_chrome_startup_error
 
-                    if is_connection_error and retry < max_account_retries:
-                        retry_delay = 5 * (retry + 1)
-                        safe_print(f"⚠️ 帳號 {username} 連線中斷 (第 {retry + 1} 次)，{retry_delay} 秒後重試...")
+                    if is_retryable and retry < max_account_retries:
+                        retry_delay = 8 * (retry + 1) if is_chrome_startup_error else 5 * (retry + 1)
+                        error_type = "Chrome 啟動失敗" if is_chrome_startup_error else "連線中斷"
+                        safe_print(f"⚠️ 帳號 {username} {error_type} (第 {retry + 1} 次)，{retry_delay} 秒後重試...")
                         safe_print(f"   錯誤: {error_str[:100]}")
                         _cleanup_headless_chrome()
                         cleanup_temp_user_data_dirs()
                         time.sleep(retry_delay)
                         continue
                     else:
-                        # 非連線錯誤或重試用盡，記錄失敗
-                        if is_connection_error and retry >= max_account_retries:
-                            safe_print(f"💥 帳號 {username} 連線重試 {max_account_retries} 次後仍失敗: {e}")
+                        # 不可重試錯誤或重試用盡，記錄失敗
+                        if is_retryable and retry >= max_account_retries:
+                            safe_print(f"💥 帳號 {username} 重試 {max_account_retries} 次後仍失敗: {e}")
                         else:
                             safe_print(f"💥 帳號 {username} 處理失敗: {e}")
                         results.append({"success": False, "username": username, "error": error_str, "downloads": []})
