@@ -6,8 +6,10 @@
 """
 
 import os
+import sys
 import json
 import time
+import logging
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -16,6 +18,58 @@ from ..utils.windows_encoding_utils import safe_print
 from ..utils.discord_notifier import DiscordNotifier
 from ..utils.email_notifier import EmailNotifier
 from .browser_utils import _cleanup_headless_chrome, cleanup_temp_user_data_dirs
+
+
+def _setup_file_logger(function_name):
+    """
+    設定檔案日誌記錄器，將 stdout/stderr 同時輸出到日誌檔
+
+    Args:
+        function_name: 功能名稱，用於日誌檔命名
+
+    Returns:
+        tuple: (log_file_path, original_stdout, original_stderr, tee_stdout, tee_stderr)
+    """
+    logs_dir = Path("logs")
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = logs_dir / f"{timestamp}_{function_name}.log"
+
+    class TeeWriter:
+        """同時輸出到原始 stdout/stderr 和日誌檔"""
+        def __init__(self, original, log_fh):
+            self.original = original
+            self.log_fh = log_fh
+
+        def write(self, data):
+            self.original.write(data)
+            try:
+                self.log_fh.write(data)
+                self.log_fh.flush()
+            except Exception:
+                pass
+
+        def flush(self):
+            self.original.flush()
+            try:
+                self.log_fh.flush()
+            except Exception:
+                pass
+
+        @property
+        def encoding(self):
+            return getattr(self.original, 'encoding', 'utf-8')
+
+    log_fh = open(log_file, "w", encoding="utf-8")
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    tee_stdout = TeeWriter(original_stdout, log_fh)
+    tee_stderr = TeeWriter(original_stderr, log_fh)
+    sys.stdout = tee_stdout
+    sys.stderr = tee_stderr
+
+    return log_file, original_stdout, original_stderr, log_fh
 
 
 class MultiAccountManager:
@@ -119,6 +173,26 @@ class MultiAccountManager:
         """
         # 開始總執行時間計時
         self.total_start_time = datetime.now()
+
+        # 設定檔案日誌（功能名稱用於命名）
+        scraper_class_name = scraper_class.__name__
+        function_name_for_log = self.SCRAPER_NAMES.get(scraper_class_name, scraper_class_name)
+        log_file, original_stdout, original_stderr, log_fh = _setup_file_logger(function_name_for_log)
+        safe_print(f"📝 執行日誌: {log_file}")
+
+        try:
+            return self._run_all_accounts_inner(scraper_class, headless_override, progress_callback, **scraper_kwargs)
+        finally:
+            # 還原 stdout/stderr 並關閉日誌檔
+            sys.stdout = original_stdout
+            sys.stderr = original_stderr
+            try:
+                log_fh.close()
+            except Exception:
+                pass
+
+    def _run_all_accounts_inner(self, scraper_class, headless_override=None, progress_callback=None, **scraper_kwargs):
+        """run_all_accounts 的內部實作（包裹在日誌系統中）"""
         safe_print(f"⏱️ 總執行開始時間: {self.total_start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # 記錄當前執行的功能名稱

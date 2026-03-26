@@ -238,15 +238,26 @@ def init_chrome_browser(headless=False, download_dir=None, max_retries=3, retry_
         if is_linux:
             chrome_options.add_argument("--disable-features=VizDisplayCompositor")  # 節省記憶體 ~80MB
             chrome_options.add_argument("--disable-software-rasterizer")  # 節省 CPU ~15%
+            # 排程/cron 環境穩定性選項（無 DISPLAY、無 dbus 時也能正常啟動）
+            chrome_options.add_argument("--disable-crash-reporter")         # 防止 crash reporter 在 cron 中掛起
+            chrome_options.add_argument("--disable-in-process-stack-traces")  # 減少排程環境中的開銷
+            chrome_options.add_argument("--disable-background-networking")  # 禁用背景網路請求
+            chrome_options.add_argument("--disable-default-apps")           # 禁用預設應用
+            chrome_options.add_argument("--disable-renderer-backgrounding") # 防止 renderer 被節流
+            chrome_options.add_argument("--disable-background-timer-throttling")  # 防止計時器被節流
+            chrome_options.add_argument("--disable-backgrounding-occluded-windows")  # 防止被遮擋視窗降速
+            chrome_options.add_argument("--disable-ipc-flooding-protection")  # 防止 IPC 保護機制干擾
+            chrome_options.add_argument("--disable-setuid-sandbox")         # snap 環境需要
             if attempt == 1:
-                safe_print("🐧 Ubuntu/Linux 環境偵測: 已套用記憶體優化參數")
+                safe_print("🐧 Ubuntu/Linux 環境偵測: 已套用記憶體優化 + 排程穩定性參數")
         else:
             # 非 Linux 環境也禁用 VizDisplayCompositor
             chrome_options.add_argument("--disable-features=VizDisplayCompositor")
 
         # 如果設定為無頭模式，添加 headless 參數
         if headless:
-            chrome_options.add_argument("--headless")
+            # Chrome 109+ 使用新版 headless 模式，更穩定且功能更完整
+            chrome_options.add_argument("--headless=new")
             if attempt == 1:
                 safe_print("🔇 使用無頭模式（不顯示瀏覽器視窗）")
         else:
