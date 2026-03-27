@@ -154,9 +154,15 @@ class BaseScraper:
         """
         try:
             return WebDriverWait(self.driver, timeout, poll_frequency=poll_frequency).until(condition)
-        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException) as e:
-            safe_print(f"💀 {error_message}（瀏覽器可能已崩潰）: {e}")
+        except (InvalidSessionIdException, NoSuchWindowException) as e:
+            safe_print(f"💀 {error_message}（瀏覽器已崩潰）: {e}")
             raise
+        except WebDriverException as e:
+            if not self.is_browser_alive():
+                safe_print(f"💀 {error_message}（瀏覽器已崩潰）: {e}")
+                raise
+            safe_print(f"⚠️ {error_message}: {e}")
+            return None
         except Exception as e:
             safe_print(f"⚠️ {error_message}: {e}")
             return None
@@ -175,17 +181,28 @@ class BaseScraper:
         if old_url is None:
             try:
                 old_url = self.driver.current_url
-            except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
-                safe_print("💀 無法取得當前 URL（瀏覽器可能已崩潰）")
+            except (InvalidSessionIdException, NoSuchWindowException):
+                safe_print("💀 無法取得當前 URL（瀏覽器已崩潰）")
                 raise
+            except WebDriverException:
+                if not self.is_browser_alive():
+                    safe_print("💀 無法取得當前 URL（瀏覽器已崩潰）")
+                    raise
+                return False
 
         try:
             WebDriverWait(self.driver, timeout).until(lambda d: d.current_url != old_url)
             safe_print(f"✅ URL 已變化: {old_url} → {self.driver.current_url}")
             return True
-        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+        except (InvalidSessionIdException, NoSuchWindowException):
             safe_print("💀 等待 URL 變化時瀏覽器崩潰")
             raise
+        except WebDriverException:
+            if not self.is_browser_alive():
+                safe_print("💀 等待 URL 變化時瀏覽器崩潰")
+                raise
+            safe_print(f"⚠️ URL 在 {timeout} 秒內未變化")
+            return False
         except Exception:
             safe_print(f"⚠️ URL 在 {timeout} 秒內未變化")
             return False
@@ -209,9 +226,15 @@ class BaseScraper:
             else:
                 element = WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, value)))
             return element
-        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+        except (InvalidSessionIdException, NoSuchWindowException):
             safe_print(f"💀 等待元素 {by}={value} 時瀏覽器崩潰")
             raise
+        except WebDriverException:
+            if not self.is_browser_alive():
+                safe_print(f"💀 等待元素 {by}={value} 時瀏覽器崩潰")
+                raise
+            safe_print(f"⚠️ 在 {timeout} 秒內未找到元素: {by}={value}")
+            return None
         except Exception:
             safe_print(f"⚠️ 在 {timeout} 秒內未找到元素: {by}={value}")
             return None
@@ -231,9 +254,15 @@ class BaseScraper:
         try:
             element = WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
             return element
-        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+        except (InvalidSessionIdException, NoSuchWindowException):
             safe_print(f"💀 等待元素 {by}={value} 可點擊時瀏覽器崩潰")
             raise
+        except WebDriverException:
+            if not self.is_browser_alive():
+                safe_print(f"💀 等待元素 {by}={value} 可點擊時瀏覽器崩潰")
+                raise
+            safe_print(f"⚠️ 在 {timeout} 秒內元素未變為可點擊: {by}={value}")
+            return None
         except Exception:
             safe_print(f"⚠️ 在 {timeout} 秒內元素未變為可點擊: {by}={value}")
             return None
@@ -255,9 +284,15 @@ class BaseScraper:
             )
             safe_print("✅ AJAX 請求已完成")
             return True
-        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+        except (InvalidSessionIdException, NoSuchWindowException):
             safe_print("💀 等待 AJAX 時瀏覽器崩潰")
             raise
+        except WebDriverException:
+            if not self.is_browser_alive():
+                safe_print("💀 等待 AJAX 時瀏覽器崩潰")
+                raise
+            safe_print(f"⚠️ AJAX 在 {timeout} 秒內未完成")
+            return False
         except Exception:
             safe_print(f"⚠️ AJAX 在 {timeout} 秒內未完成")
             return False
