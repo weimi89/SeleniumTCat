@@ -36,9 +36,9 @@ class PaymentScraper(BaseScraper):
     DOWNLOAD_DIR_ENV_KEY = "PAYMENT_DOWNLOAD_WORK_DIR"
     DOWNLOAD_OK_DIR_ENV_KEY = "PAYMENT_DOWNLOAD_OK_DIR"
 
-    def __init__(self, username, password, headless=None, period_number=1, quiet_init=False):
+    def __init__(self, username, password, headless=None, period_number=1, quiet_init=False, shared_driver=None):
         # 呼叫父類建構子
-        super().__init__(username, password, headless)
+        super().__init__(username, password, headless, shared_driver=shared_driver)
 
         # PaymentScraper 特有的屬性
         # 儲存當前選擇的結算區間
@@ -1132,10 +1132,8 @@ class PaymentScraper(BaseScraper):
             return []
 
     def close(self):
-        """關閉瀏覽器"""
-        if self.driver:
-            self.driver.quit()
-            safe_print("🔚 瀏覽器已關閉")
+        """關閉瀏覽器（委託父類處理共享模式判斷）"""
+        super().close()
 
     def run_full_process(self):
         """執行完整的自動化流程"""

@@ -16,8 +16,13 @@ import ddddocr
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import (
+    WebDriverException,
+    InvalidSessionIdException,
+    NoSuchWindowException,
+)
 
-from .browser_utils import init_chrome_browser, cleanup_temp_user_data_dirs, _cleanup_headless_chrome
+from .browser_utils import init_chrome_browser, cleanup_temp_user_data_dirs, _cleanup_headless_chrome, check_browser_health
 from ..utils.windows_encoding_utils import safe_print
 
 
@@ -29,7 +34,7 @@ class BaseScraper:
     # 子類別必須覆寫此類別變數，指定已完成下載目錄的環境變數名稱
     DOWNLOAD_OK_DIR_ENV_KEY = None
 
-    def __init__(self, username, password, headless=None):
+    def __init__(self, username, password, headless=None, shared_driver=None):
         # 載入環境變數
         load_dotenv()
 
@@ -46,6 +51,11 @@ class BaseScraper:
 
         self.driver = None
         self.wait = None
+
+        # 共享瀏覽器模式：由外部（MultiAccountManager）傳入已建立的 driver
+        # shared_driver 為 (driver, wait) tuple 或 None
+        self._shared_driver = shared_driver
+        self._owns_browser = shared_driver is None
 
         # 安全警告標記 - 用於跟蹤是否遇到密碼安全警告
         self.security_warning_encountered = False
@@ -144,6 +154,9 @@ class BaseScraper:
         """
         try:
             return WebDriverWait(self.driver, timeout, poll_frequency=poll_frequency).until(condition)
+        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException) as e:
+            safe_print(f"💀 {error_message}（瀏覽器可能已崩潰）: {e}")
+            raise
         except Exception as e:
             safe_print(f"⚠️ {error_message}: {e}")
             return None
@@ -160,13 +173,20 @@ class BaseScraper:
             是否成功變化
         """
         if old_url is None:
-            old_url = self.driver.current_url
+            try:
+                old_url = self.driver.current_url
+            except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+                safe_print("💀 無法取得當前 URL（瀏覽器可能已崩潰）")
+                raise
 
         try:
             WebDriverWait(self.driver, timeout).until(lambda d: d.current_url != old_url)
             safe_print(f"✅ URL 已變化: {old_url} → {self.driver.current_url}")
             return True
-        except:
+        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+            safe_print("💀 等待 URL 變化時瀏覽器崩潰")
+            raise
+        except Exception:
             safe_print(f"⚠️ URL 在 {timeout} 秒內未變化")
             return False
 
@@ -189,7 +209,10 @@ class BaseScraper:
             else:
                 element = WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, value)))
             return element
-        except:
+        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+            safe_print(f"💀 等待元素 {by}={value} 時瀏覽器崩潰")
+            raise
+        except Exception:
             safe_print(f"⚠️ 在 {timeout} 秒內未找到元素: {by}={value}")
             return None
 
@@ -208,7 +231,10 @@ class BaseScraper:
         try:
             element = WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
             return element
-        except:
+        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+            safe_print(f"💀 等待元素 {by}={value} 可點擊時瀏覽器崩潰")
+            raise
+        except Exception:
             safe_print(f"⚠️ 在 {timeout} 秒內元素未變為可點擊: {by}={value}")
             return None
 
@@ -229,7 +255,10 @@ class BaseScraper:
             )
             safe_print("✅ AJAX 請求已完成")
             return True
-        except:
+        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException):
+            safe_print("💀 等待 AJAX 時瀏覽器崩潰")
+            raise
+        except Exception:
             safe_print(f"⚠️ AJAX 在 {timeout} 秒內未完成")
             return False
 
@@ -284,7 +313,12 @@ class BaseScraper:
     # ==================== 原有方法 ====================
 
     def init_browser(self):
-        """初始化瀏覽器"""
+        """初始化瀏覽器（支援共享模式）"""
+        if self._shared_driver:
+            self.driver, self.wait = self._shared_driver
+            safe_print("♻️ 使用共享瀏覽器")
+            return
+
         # 使用預設的 downloads 目錄初始化瀏覽器
         # 實際的 UUID 臨時目錄將在需要下載時才建立
         default_download_dir = self.final_download_dir
@@ -615,7 +649,14 @@ class BaseScraper:
             return False
 
     def close(self):
-        """關閉瀏覽器並清理臨時資源"""
+        """關閉瀏覽器並清理臨時資源（共享模式下僅解除引用）"""
+        if not self._owns_browser:
+            # 共享模式：不關閉瀏覽器，僅解除引用
+            safe_print("♻️ 共享瀏覽器模式，跳過關閉")
+            self.driver = None
+            self.wait = None
+            return
+
         if self.driver:
             try:
                 self.driver.quit()
@@ -629,6 +670,84 @@ class BaseScraper:
 
         # 清理 Chrome 臨時 user-data-dir
         cleanup_temp_user_data_dirs()
+
+    # ==================== 瀏覽器健康檢查與重建 ====================
+
+    def is_browser_alive(self):
+        """
+        檢查瀏覽器是否仍然存活且可回應
+
+        Returns:
+            bool: 瀏覽器是否存活
+        """
+        if not self.driver:
+            return False
+        alive, error = check_browser_health(self.driver)
+        if not alive:
+            safe_print(f"💀 瀏覽器已失效: {error}")
+        return alive
+
+    def _rebuild_browser(self):
+        """
+        銷毀死掉的瀏覽器並重建新的
+
+        Returns:
+            tuple: 新的 (driver, wait)
+        """
+        safe_print("🔧 重建瀏覽器...")
+
+        # 強制關閉死掉的 driver
+        if self.driver:
+            try:
+                self.driver.quit()
+            except Exception:
+                pass
+        _cleanup_headless_chrome()
+        cleanup_temp_user_data_dirs()
+        self.driver = None
+        self.wait = None
+
+        time.sleep(2)
+
+        # 建立新的瀏覽器
+        default_download_dir = self.final_download_dir
+        self.driver, self.wait = init_chrome_browser(
+            headless=self.headless,
+            download_dir=str(default_download_dir.absolute()),
+        )
+
+        # 更新共享引用，讓 MultiAccountManager 能追蹤最新的 driver
+        self._shared_driver = (self.driver, self.wait)
+        safe_print("✅ 瀏覽器重建完成")
+        return self.driver, self.wait
+
+    def reset_for_new_account(self, username, password):
+        """
+        清除 session 並準備切換至新帳號（共享瀏覽器模式專用）
+
+        清除 cookies 後導航至登入頁面，讓後續 login() 可以用新帳號登入。
+        如果瀏覽器已死，會自動重建。
+
+        Args:
+            username: 新帳號的使用者名稱
+            password: 新帳號的密碼
+        """
+        self.username = username
+        self.password = password
+        self.security_warning_encountered = False
+
+        if not self.is_browser_alive():
+            self._rebuild_browser()
+            return
+
+        try:
+            self.driver.delete_all_cookies()
+            self.driver.get(self.url)
+            self.smart_wait_for_element(By.ID, "txtUserID", timeout=10, visible=True)
+            safe_print(f"♻️ 已重置瀏覽器，準備切換至帳號: {username}")
+        except (WebDriverException, InvalidSessionIdException, NoSuchWindowException) as e:
+            safe_print(f"⚠️ 重置失敗，重建瀏覽器: {e}")
+            self._rebuild_browser()
 
     def start_execution_timer(self):
         """開始執行時間計時"""

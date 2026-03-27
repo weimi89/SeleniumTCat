@@ -37,10 +37,10 @@ class FreightScraper(BaseScraper):
     DOWNLOAD_OK_DIR_ENV_KEY = "FREIGHT_DOWNLOAD_OK_DIR"
 
     def __init__(
-        self, username, password, headless=None, start_date=None, end_date=None, quiet_init=False
+        self, username, password, headless=None, start_date=None, end_date=None, quiet_init=False, shared_driver=None
     ):
         # 呼叫父類建構子
-        super().__init__(username, password, headless)
+        super().__init__(username, password, headless, shared_driver=shared_driver)
 
         # FreightScraper 特有的屬性
         # 日期範圍設定（格式：YYYYMMDD）

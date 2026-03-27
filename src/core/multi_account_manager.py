@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from ..utils.windows_encoding_utils import safe_print
 from ..utils.discord_notifier import DiscordNotifier
 from ..utils.email_notifier import EmailNotifier
-from .browser_utils import _cleanup_headless_chrome, cleanup_temp_user_data_dirs
+from .browser_utils import _cleanup_headless_chrome, cleanup_temp_user_data_dirs, init_chrome_browser, check_browser_health
 
 
 def _setup_file_logger(function_name):
@@ -161,6 +161,28 @@ class MultiAccountManager:
         """取得啟用的帳號列表"""
         return [acc for acc in self.config if acc.get("enabled", True)]
 
+    def _create_shared_browser(self, headless):
+        """
+        建立共享瀏覽器實例
+
+        Args:
+            headless: 是否使用無頭模式（None 表示從環境變數讀取）
+
+        Returns:
+            tuple: (driver, wait)
+        """
+        safe_print("🚀 建立共享瀏覽器...")
+
+        # 解析 headless 設定
+        if headless is not None:
+            use_headless = headless
+        else:
+            use_headless = os.getenv("HEADLESS", "true").lower() == "true"
+
+        driver, wait = init_chrome_browser(headless=use_headless, download_dir=None)
+        safe_print("✅ 共享瀏覽器建立完成")
+        return (driver, wait)
+
     def run_all_accounts(self, scraper_class, headless_override=None, progress_callback=None, **scraper_kwargs):
         """
         執行所有啟用的帳號
@@ -232,6 +254,16 @@ class MultiAccountManager:
 
         max_account_retries = 2  # 每個帳號最多重試 2 次（共 3 次嘗試）
 
+        # ==================== 共享瀏覽器模式 ====================
+        # 建立一個 Chrome 實例，所有帳號共用，減少開關瀏覽器的不穩定因素
+        shared_browser = None  # (driver, wait) tuple 或 None
+        if len(accounts) > 1:
+            try:
+                shared_browser = self._create_shared_browser(use_headless)
+            except Exception as e:
+                safe_print(f"⚠️ 共享瀏覽器建立失敗，退回逐帳號模式: {e}")
+                shared_browser = None
+
         for i, account in enumerate(accounts, 1):
             username = account["username"]
             password = account["password"]
@@ -243,15 +275,24 @@ class MultiAccountManager:
                 print(f"\n{progress_msg}")
                 print("-" * 50)
 
-            # 主動清理前一個帳號可能殘留的 Chrome 進程和臨時檔案
-            if i > 1:
-                _cleanup_headless_chrome()
-                cleanup_temp_user_data_dirs()
+            # 共享模式：帳號切換前檢查瀏覽器健康
+            if shared_browser and i > 1:
+                alive, error_msg = check_browser_health(shared_browser[0])
+                if not alive:
+                    safe_print(f"💀 共享瀏覽器已失效: {error_msg}，重建中...")
+                    _cleanup_headless_chrome()
+                    cleanup_temp_user_data_dirs()
+                    time.sleep(2)
+                    try:
+                        shared_browser = self._create_shared_browser(use_headless)
+                    except Exception as e:
+                        safe_print(f"⚠️ 共享瀏覽器重建失敗，退回逐帳號模式: {e}")
+                        shared_browser = None
 
-                # 批次冷卻：每 5 個帳號額外等待，讓系統釋放資源（port、記憶體）
+                # 批次冷卻：每 5 個帳號等待，讓系統釋放資源
                 if (i - 1) % 5 == 0:
-                    safe_print("🧊 批次冷卻：等待 5 秒讓系統釋放資源...")
-                    time.sleep(5)
+                    safe_print("🧊 批次冷卻：等待 3 秒...")
+                    time.sleep(3)
 
             # 準備 scraper 基本參數
             scraper_init_kwargs = {
@@ -259,6 +300,7 @@ class MultiAccountManager:
                 "password": password,
                 "headless": use_headless,
                 "quiet_init": True,  # 全域設定已在上方顯示，抑制重複訊息
+                "shared_driver": shared_browser,
             }
 
             # 合併額外的 scraper 參數
@@ -268,7 +310,16 @@ class MultiAccountManager:
             for retry in range(max_account_retries + 1):
                 try:
                     scraper = scraper_class(**scraper_init_kwargs)
+
+                    # 共享模式：非首帳號需要先重置瀏覽器（清 cookie → 導航登入頁）
+                    if shared_browser and i > 1:
+                        scraper.reset_for_new_account(username, password)
+
                     result = scraper.run_full_process()
+
+                    # 更新共享瀏覽器引用（可能在操作中被重建）
+                    if shared_browser and scraper._shared_driver:
+                        shared_browser = scraper._shared_driver
 
                     # 將時間統計添加到結果中
                     execution_summary = scraper.get_execution_summary()
@@ -285,16 +336,41 @@ class MultiAccountManager:
                         'ConnectionRefusedError', 'NewConnectionError',
                     ])
                     is_chrome_startup_error = '所有 Chrome 啟動方法都失敗了' in error_str
-                    is_retryable = is_connection_error or is_chrome_startup_error
+                    # 新增：WebDriver 特定異常也視為可重試
+                    is_browser_crash = any(kw in error_str for kw in [
+                        'WebDriverException', 'InvalidSessionIdException',
+                        'NoSuchWindowException', 'no such session',
+                        'chrome not reachable', 'session not created',
+                    ])
+                    is_retryable = is_connection_error or is_chrome_startup_error or is_browser_crash
 
                     if is_retryable and retry < max_account_retries:
                         retry_delay = 8 * (retry + 1) if is_chrome_startup_error else 5 * (retry + 1)
-                        error_type = "Chrome 啟動失敗" if is_chrome_startup_error else "連線中斷"
+                        if is_browser_crash:
+                            error_type = "瀏覽器崩潰"
+                        elif is_chrome_startup_error:
+                            error_type = "Chrome 啟動失敗"
+                        else:
+                            error_type = "連線中斷"
                         safe_print(f"⚠️ 帳號 {username} {error_type} (第 {retry + 1} 次)，{retry_delay} 秒後重試...")
                         safe_print(f"   錯誤: {error_str[:100]}")
-                        _cleanup_headless_chrome()
-                        cleanup_temp_user_data_dirs()
-                        time.sleep(retry_delay)
+
+                        # 瀏覽器崩潰時重建共享瀏覽器
+                        if shared_browser and (is_browser_crash or is_connection_error):
+                            _cleanup_headless_chrome()
+                            cleanup_temp_user_data_dirs()
+                            time.sleep(retry_delay)
+                            try:
+                                shared_browser = self._create_shared_browser(use_headless)
+                                scraper_init_kwargs["shared_driver"] = shared_browser
+                            except Exception:
+                                safe_print("⚠️ 共享瀏覽器重建失敗，退回逐帳號模式")
+                                shared_browser = None
+                                scraper_init_kwargs["shared_driver"] = None
+                        else:
+                            _cleanup_headless_chrome()
+                            cleanup_temp_user_data_dirs()
+                            time.sleep(retry_delay)
                         continue
                     else:
                         # 不可重試錯誤或重試用盡，記錄失敗
@@ -311,6 +387,16 @@ class MultiAccountManager:
             if i < len(accounts):
                 safe_print("⏳ 等待 3 秒後處理下一個帳號...")
                 time.sleep(3)
+
+        # 清理共享瀏覽器
+        if shared_browser:
+            safe_print("🔚 關閉共享瀏覽器...")
+            try:
+                shared_browser[0].quit()
+            except Exception:
+                pass
+            _cleanup_headless_chrome()
+            cleanup_temp_user_data_dirs()
 
         # 結束總執行時間計時
         self.total_end_time = datetime.now()

@@ -36,9 +36,9 @@ class UnpaidScraper(BaseScraper):
     DOWNLOAD_DIR_ENV_KEY = "UNPAID_DOWNLOAD_WORK_DIR"
     DOWNLOAD_OK_DIR_ENV_KEY = "UNPAID_DOWNLOAD_OK_DIR"
 
-    def __init__(self, username, password, headless=None, days=None, quiet_init=False):
+    def __init__(self, username, password, headless=None, days=None, quiet_init=False, shared_driver=None):
         # 呼叫父類建構子
-        super().__init__(username, password, headless)
+        super().__init__(username, password, headless, shared_driver=shared_driver)
 
         # UnpaidScraper 特有的屬性
         # 天數設定（預設為 30 天）
