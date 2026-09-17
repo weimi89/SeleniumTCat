@@ -79,7 +79,6 @@ accounts*.json
 !accounts.json.example
 
 # 本地設定檔案
-.claude/settings.local.json
 
 # 下載的檔案
 downloads/*.xlsx
@@ -168,12 +167,9 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 # BMAD (local only)
-.bmad-core/
-.bmad-*/
 
 tests/*
 
-.claude/settings.local.json
 .claude-sessions
 
 uv.lock
@@ -182,4 +178,23 @@ uv.lock
 # OpenSpec 和 Serena
 # ======================
 openspec/
-.serena/
+
+# AI 協作文件與規則一律放 ../SeleniumBrain，專案內只有符號連結，不入版控、不部署
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.claude
+.serena
+.codex
+.cursor
+.cursorignore
+.gemini
+.ai
+.bmad-core
+.mcp.json
+boost.json
+openspec
+graphify-out
+CLAUDE.local.md
+.agents
+backups/
