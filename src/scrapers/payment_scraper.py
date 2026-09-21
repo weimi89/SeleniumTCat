@@ -615,7 +615,8 @@ class PaymentScraper(BaseScraper):
                     select_obj = Select(select_element)
                     options = select_obj.options
 
-                    if len(options) > 1:  # 確保有選項
+                    # 只有一期時選單也只有一個選項，仍是有效期數；是否為「無資料」由下方 valid_options 過濾判定
+                    if options:
                         print(f"   檢查選單: {select_name} (id: {select_id}) - {len(options)} 個選項")
 
                         # 顯示前幾個和最後幾個選項
@@ -636,25 +637,7 @@ class PaymentScraper(BaseScraper):
                         option_texts = [opt.text.strip() for opt in options if opt.text.strip()]
                         date_keywords = ["202", "2025", "2024", "結算", "期間", "月"]
 
-                        # 首先檢查是否只有一個選項且為無資料狀態
-                        if len(options) == 1:
-                            single_option = options[0]
-                            option_value = single_option.get_attribute("value")
-                            option_text = single_option.text.strip()
-
-                            # 如果只有一個選項且 value="~" 或包含無資料關鍵字
-                            if option_value == "~" or any(
-                                keyword in option_text
-                                for keyword in ["無日期區間可供查詢", "無資料", "沒有資料", "無可用資料", "無日期區間"]
-                            ):
-                                safe_print(
-                                    f"   ℹ️ 該帳號只有一個選項且為無資料狀態: '{option_text}' (value: {option_value})"
-                                )
-                                safe_print("   ⏭️ 跳過此帳號，沒有可下載的資料")
-                                self.current_settlement_period = None
-                                return "NO_DATA_AVAILABLE"
-
-                        # 檢查是否只有「無日期區間可供查詢」或類似的無資料選項
+                        # 無資料選項（value="~" 或含以下關鍵字）不算有效期數
                         no_data_keywords = ["無日期區間可供查詢", "無資料", "沒有資料", "無可用資料", "無日期區間"]
 
                         # 獲取所有有效的結算區間選項（排除無資料選項和空選項）
@@ -696,26 +679,14 @@ class PaymentScraper(BaseScraper):
                                 safe_print(f"      期數 {i+1}: {period_text}")
 
                             selected_period = True
-                            # 先選擇第一期作為起始點
+                            # 先選擇第一個有效期數作為起始點（不用 options[0]，避免選到佔位或無資料選項）
                             try:
-                                first_valid_index = None
-                                for idx, opt in enumerate(options):
-                                    if opt.text.strip():
-                                        first_valid_index = idx
-                                        break
-
-                                if first_valid_index is not None:
-                                    select_obj.select_by_index(first_valid_index)
-                                    time.sleep(2)
-                                    # 獲取選中的選項文字
-                                    selected_option = options[first_valid_index]
-                                    self.current_settlement_period = selected_option.text.strip()
-                                    safe_print(
-                                        f"   ✅ 已選擇第 {first_valid_index + 1} 期作為起始: {self.current_settlement_period}"
-                                    )
-                                    break
-                                else:
-                                    safe_print("   ⚠️ 找到有效選項但無法選擇")
+                                first_period_text = valid_options[0].text.strip()
+                                select_obj.select_by_visible_text(first_period_text)
+                                time.sleep(2)
+                                self.current_settlement_period = first_period_text
+                                safe_print(f"   ✅ 已選擇第 1 期作為起始: {self.current_settlement_period}")
+                                break
                             except Exception as select_e:
                                 safe_print(f"   ❌ 選擇第 1 期失敗: {select_e}")
 
